@@ -1,6 +1,6 @@
 // Проходит основные сценарии интерфейса FitWatch в имитации браузера (jsdom). Файлы проекта только читаются.
 // Запуск: npm i --no-save jsdom && node test-ui/flow.js  (jsdom не входит в зависимости проекта).
-// Это НЕ настоящий браузер: видео YouTube, загрузка модели по фото и вид на телефоне здесь не проверяются.
+// Это НЕ настоящий браузер: видео YouTube, звук, конфетти, загрузка модели по фото и вид на телефоне здесь не проверяются.
 const fs = require("fs"), path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
 const ROOT = path.join(__dirname, "..");
@@ -12,7 +12,7 @@ function load() {
   const vc = new VirtualConsole();
   vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0]));
   vc.on("error", e => errors.push(String(e)));
-  const dom = new JSDOM(html, { url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc, beforeParse(win) { win.scrollTo = () => {}; } });
+  const dom = new JSDOM(html, { url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc, beforeParse(win) { win.scrollTo = () => {}; win.HTMLCanvasElement.prototype.getContext = () => null; } });
   dom.window.alert = msg => { dom.window.__alerts = (dom.window.__alerts || []).concat(msg); };
   dom.window.confirm = () => true;
   dom.window.scrollTo = () => {};
@@ -66,8 +66,19 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok(st2.log.length === 1 && st2.log[0].p === "plan" && st2.log[0].d === "w1" && st2.log[0].t, "тренировка по плану записана");
   ok(/Тренировка засчитана/.test(text(w, "#checkin")), "показано подтверждение");
   ok(text(w, "#badge") !== before, "баллы выросли");
+  ok(!!$(w, "#checkin .celebrate"), "праздник показан");
+  await tick(w, 1100);
+  ok(text(w, "#cu") === "20", "счётчик баллов дошёл до 20");
+  ok(/Достижение: Первый шаг/.test(text(w, ".toasts")), "уведомление о достижении «Первый шаг»");
+  ok(state(w).seen.includes("first") && state(w).seen.includes("plan"), "достижения записаны как показанные");
   await go(w, "#/");
   ok($$(w, 'main a.card[href="#/pd/w2"]').length === 1, "главная ведёт к следующему дню плана");
+  ok(!!$(w, ".ring .val") && /1\/4/.test(text(w, ".ring .num")), "главная: кольцо недели 1/4");
+  ok(!!$(w, ".flame") && !$(w, ".flame.off") && text(w, ".streak .n") === "1", "главная: огонёк серии 1");
+  ok($$(w, ".dot").length === 7 && $$(w, ".dot.done").length === 1 && $$(w, ".dot.today").length === 1, "главная: 7 точек недели, сегодня отмечено");
+  await tick(w, 120);
+  ok(/%$/.test($(w, ".xp > i").style.width) && $(w, ".xp > i").style.width !== "0%", "главная: шкала уровня заполнилась");
+  ok(/Уровень 1 · Новичок/.test(text(w, "main")) && /Следующее достижение/.test(text(w, "main")), "главная: уровень и подсказка достижения");
 
   // 4. каталог и модель тела
   await go(w, "#/library");
@@ -144,6 +155,19 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok(/Моя цель и параметры/.test(text(w, "main")) && /Мой план · День 1/.test(text(w, "main")), "профиль: анкета и история по плану");
   ok(/## Анкета/.test($(w, "#rep").value) && /Мой план: День 1/.test($(w, "#rep").value) && /Б \d/.test($(w, "#rep").value), "отчёт содержит анкету, план и БЖУ");
   ok(!/Claude/.test(text(w, "main")), "в профиле нет упоминания Claude");
+
+  // 7b. звук и достижения
+  ok(w.document.getElementById("snd").getAttribute("aria-pressed") === "true", "звук по умолчанию включён");
+  click(w, w.document.getElementById("snd"));
+  ok(w.localStorage.getItem("fitwatch.sound") === "off" && w.document.getElementById("snd").getAttribute("aria-pressed") === "false", "звук выключается и запоминается");
+  click(w, w.document.getElementById("snd"));
+  ok(w.localStorage.getItem("fitwatch.sound") === "on", "звук включается обратно");
+  await go(w, "#/profile");
+  ok(/Достижения/.test(text(w, "main")) && $$(w, ".bd.got").length >= 2 && $$(w, ".bd.lock").length >= 5, "профиль: открытые и закрытые достижения");
+  w.document.querySelector(".toasts").innerHTML = "";
+  click(w, $(w, "#demo")); await tick(w, 120);
+  ok($$(w, ".toast").length === 0, "демо-данные не вызывают лавину уведомлений");
+  ok(state(w).seen.length >= 3, "после демо достижения отмечены как показанные");
 
   // 8. старые маршруты работают
   for (const h of ["#/programs", "#/p/start", "#/d/start/d1", "#/e/start/squat", "#/trainer", "#/checkin", "#/plan"]) {

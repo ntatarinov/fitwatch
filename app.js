@@ -10,17 +10,21 @@
   window.Catalog.resolve(PROGRAMS);
 
   // ---------- состояние профиля (localStorage) ----------
+  // seen — открытые достижения, о которых уже сказали; lvl — последний показанный уровень (null/0 — ещё не отмечено)
   // me — анкета (цель, уровень, дни, ограничения, параметры); plan — подобранный план {builtAt, params, days, warnings};
   // done/watched — просмотр видео; log — отметки «Я потренировался» [{date,p,d,points,t}];
   // checkins — ежедневный отзыв [{date,energy,mood,barrier,liked,disliked,idea}];
   // food — дневник питания [{date,name,kcal, p,f,c,grams,nid}] (БЖУ может не быть)
-  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null });
+  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null, seen: null, lvl: 0 });
   function load() {
     try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY))); }
     catch (e) { return fresh(); }
   }
+  const hadStored = (() => { try { return localStorage.getItem(KEY) !== null; } catch (e) { return false; } })();
   let state = load();
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} renderBadge(); }
+  if (!hadStored) { state.seen = []; state.lvl = 1; } // новый человек: все достижения впереди и о них скажем
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function save() { persist(); renderBadge(); if (!checkTimer) checkTimer = setTimeout(checkProgress, 0); }
   const k = (p, e) => p + "/" + e;
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const exOf = (p, id) => p.exercises.find(e => e.id === id);
@@ -60,6 +64,26 @@
   }
   const trainedToday = () => state.log.some(l => l.date === today());
   const todayCheckin = () => state.checkins.find(c => c.date === today()) || null;
+  function progressStats() {
+    return { workouts: workoutDates().length, streak: streak(), points: totalPoints(), checkins: state.checkins.length,
+      foodDays: new Set(state.food.map(f => f.date)).size, videos: Object.keys(state.done).filter(x => state.done[x]).length, hasPlan: !!state.plan };
+  }
+  // Проверка нового уровня и достижений после любого сохранения. У тех, у кого данные уже были, всё открытое отмечается тихо.
+  let checkTimer = null;
+  function checkProgress() {
+    checkTimer = null;
+    const A = window.Achievements, X = window.FX, s = progressStats(), ids = A.unlockedIds(s), L = A.levelOf(s.points);
+    if (state.seen == null) { state.seen = ids; state.lvl = L.index; persist(); return; }
+    const fresh = ids.filter(id => !state.seen.includes(id)), up = L.index > (state.lvl || 1);
+    if (!fresh.length && !up && L.index === state.lvl) return;
+    state.seen = state.seen.concat(fresh); state.lvl = L.index; persist();
+    if (up) { X.toast("Новый уровень: " + L.title + "!", "🏆"); X.play("level"); }
+    fresh.forEach((id, i) => setTimeout(() => {
+      const b = A.BADGES.find(x => x.id === id);
+      X.toast("Достижение: " + b.title, b.emoji);
+      if (!up) X.play("badge");
+    }, 700 * (i + (up ? 1 : 0))));
+  }
   function renderBadge() { badge.textContent = "⭐ " + totalPoints() + " · " + state.name; }
 
   function profileNow() {
@@ -147,6 +171,8 @@
       { date: today(), name: "Куриная грудка (150 г)", kcal: 165 },
     ];
     state = s;
+    state.seen = window.Achievements.unlockedIds(progressStats());
+    state.lvl = window.Achievements.levelOf(totalPoints()).index;
     save();
   }
 
@@ -205,6 +231,34 @@
     return `<div class="hero ${a.kind}"><h2>${esc(a.title)}</h2><p>${esc(a.text)}</p>${act ? `<a class="btn" href="${act[0]}">${act[1]}</a>` : ""}</div>`;
   }
 
+  const weekMsg = (n, goal) => n >= goal ? "Цель недели выполнена! Так держать." : n === 0 ? "Начни с одной тренировки: серия ждёт тебя." : "Осталось " + (goal - n) + " — ты справишься.";
+  function weekCardHtml() {
+    const goal = state.plan ? state.plan.days.length : 3, n = weekCount(), st = streak();
+    const pct = Math.min(100, Math.round(n / goal * 100)), off = Math.round(264 - 264 * pct / 100);
+    const dots = window.Achievements.weekDots(workoutDates().map(dayNum), dayNum(today())).map(d => `<div class="dot ${d.done ? "done" : ""} ${d.today ? "today" : ""}"><i>${d.done ? "✓" : ""}</i>${d.label}</div>`).join("");
+    return `<div class="card"><div class="week">
+        <div class="ring" role="img" aria-label="Тренировок за неделю: ${n} из ${goal}"><svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ee0a4"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+          <circle class="trk" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="val" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-dasharray="264" style="stroke-dashoffset:${off};--off:${off}"/></svg>
+          <div class="num"><b>${n}/${goal}</b><small>за 7 дней</small></div></div>
+        <div style="flex:1"><div class="streak"><span class="flame ${st ? "" : "off"}">🔥</span><span class="n">${st}</span></div><div class="muted">тренировок в серии</div>
+          <div class="muted tiny" style="margin-top:6px">${weekMsg(n, goal)}</div></div></div>
+      <div class="dots">${dots}</div></div>`;
+  }
+  function levelCardHtml() {
+    const A = window.Achievements, pts = totalPoints(), L = A.levelOf(pts), nb = A.nextBadge(progressStats());
+    return `<div class="card"><div class="row"><b>Уровень ${L.index} · ${esc(L.title)}</b><span class="muted">${pts} баллов</span></div>
+      <div class="xp" style="margin:10px 0 6px"><i style="width:0" data-w="${L.pct}"></i></div>
+      <div class="muted tiny">${L.next ? "До уровня «" + esc(L.next) + "» осталось " + L.toNext + " баллов" : "Максимальный уровень: ты легенда!"}${nb ? " · Следующее достижение: " + nb.emoji + " " + esc(nb.title) + " (" + esc(nb.hint) + ")" : ""}</div></div>`;
+  }
+  function badgesHtml() {
+    const list = window.Achievements.evaluate(progressStats()), got = list.filter(b => b.got).length;
+    return `<div class="card"><div class="row"><b>Достижения</b><span class="muted">${got} из ${list.length}</span></div><div class="badges" style="margin-top:10px">${list.map(b => `<div class="bd ${b.got ? "got" : "lock"}"><span class="em">${b.emoji}</span><b>${esc(b.title)}</b><small>${b.got ? "Открыто" : esc(b.hint)}</small></div>`).join("")}</div></div>`;
+  }
+  // Шкала уровня заполняется после появления на экране, чтобы было видно движение.
+  function animateBars() {
+    const go = () => document.querySelectorAll(".xp > i[data-w]").forEach(el => { el.style.width = el.dataset.w + "%"; });
+    (window.requestAnimationFrame || (f => setTimeout(f, 30)))(() => (window.requestAnimationFrame || (f => setTimeout(f, 30)))(go));
+  }
   function planCardHtml() {
     if (!state.me) return `<div class="card"><b>Твоя цель</b><p class="muted">Расскажи о цели, уровне и ограничениях, и я подберу план тренировок.</p><a class="btn" href="#/me">Подобрать план</a></div>`;
     const dates = state.plan ? state.plan.days.length : 0;
@@ -231,10 +285,12 @@
   const doneDays = p => p.days.filter(d => state.log.some(l => l.p === p.id && l.d === d.id)).length;
 
   function home() {
-    app.innerHTML = "<h1>Привет, " + esc(state.name) + "</h1>" +
-      adviceHtml() + planCardHtml() + statsHtml() + "<h2>Программы</h2><div class='tiles'>" +
+    const L0 = window.Achievements.levelOf(totalPoints());
+    app.innerHTML = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>` +
+      adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") +
       "</div>";
+    animateBars();
   }
 
   function programs() {
@@ -326,7 +382,9 @@
     const box = document.getElementById("checkin");
     const pts = dayPoints(d);
     if (justDone) {
-      box.innerHTML = `<div class="status ok">🎉 Тренировка засчитана! +${pts} баллов. Серия: ${streak()}. Следующая — завтра или через день: отдых тоже часть программы.</div>`;
+      box.innerHTML = `<div class="celebrate"><span class="em">🎉</span><div class="pts">+<span id="cu">0</span></div><div><b>Тренировка засчитана!</b></div>
+        <div class="muted">Серия: ${streak()} · всего ${totalPoints()} баллов. Следующая — завтра или через день: отдых тоже часть программы.</div></div>`;
+      window.FX.countUp(document.getElementById("cu"), 0, pts, 900);
       return;
     }
     if (trainedToday()) {
@@ -335,7 +393,7 @@
     }
     box.innerHTML = `<button id="done" class="wide">Я потренировался (+${pts})</button>
       <p class="muted">Отмечайте честно: за один календарный день засчитывается одна тренировка.</p>`;
-    document.getElementById("done").onclick = () => { if (logWorkout(p, d)) (rerender || (() => day(p.id, d.id, true)))(); };
+    document.getElementById("done").onclick = () => { if (logWorkout(p, d)) { window.FX.celebrate(); (rerender || (() => day(p.id, d.id, true)))(); } };
   }
 
   let player = null, timer = null;
@@ -378,8 +436,10 @@
       duration = player.getDuration();
       if (state.done[key] || !duration) return;
       state.watched[key] = (state.watched[key] || 0) + 1;
+      const wasDone = !!state.done[key];
       if (state.watched[key] >= duration * window.WATCH_THRESHOLD) state.done[key] = true;
       save(); paint();
+      if (state.done[key] && !wasDone) { window.FX.toast("Техника изучена: +" + points + " баллов", "🎬"); window.FX.play("tap"); }
     }
 
     withYouTube(() => {
@@ -435,6 +495,7 @@
     app.innerHTML = `<h1>Профиль</h1>
       <div class="card"><div class="muted">Баллы</div><div class="big">${totalPoints()}</div></div>
       ${statsHtml()}
+      ${badgesHtml()}
       ${profileCardHtml()}
       ${meCardHtml()}
       <div class="card"><label class="muted">Имя</label><div class="row" style="margin-top:6px"><input id="name" value="${esc(state.name)}" maxlength="30" style="flex:1"><button id="saveName">Сохранить</button></div></div>
@@ -479,6 +540,7 @@
 
   // ---------- роутер ----------
   function route() {
+    app.classList.remove("enter"); void app.offsetWidth; app.classList.add("enter");
     stopPlayer();
     ytCallbacks = [];
     const [, a, b, c] = location.hash.split("/");
@@ -503,6 +565,10 @@
   // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
   const PAGES = window.PAGES;
   const FW = { app, esc, today, k, get state() { return state; }, save, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
+  const snd = document.getElementById("snd");
+  const paintSnd = () => { const on = window.FX.enabled(); snd.textContent = on ? "🔊" : "🔇"; snd.setAttribute("aria-pressed", String(on)); snd.title = on ? "Звук включён" : "Звук выключен"; };
+  snd.onclick = () => { window.FX.setEnabled(!window.FX.enabled()); paintSnd(); window.FX.play("tap"); };
+  paintSnd();
   window.addEventListener("hashchange", route);
   renderBadge();
   route();
