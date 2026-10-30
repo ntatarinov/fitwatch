@@ -1,0 +1,7 @@
+{
+  "name": "fitwatch",
+  "private": true,
+  "version": "0.2.0",
+  "description": "FitWatch: fitness app prototype (static site)",
+  "scripts": { "test": "node --test test/*.test.js" }
+}

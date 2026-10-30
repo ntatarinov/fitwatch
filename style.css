@@ -73,3 +73,23 @@ select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-rad
 .result ul { padding-left:20px; margin:8px 0; }
 .result p { margin:8px 0; }
 input[type=file] { width:100%; color:var(--muted); }
+
+/* ---- анкета, план, каталог, модель тела ---- */
+.card.warn { border-left:5px solid #d97706; }
+.card.warn ul { margin:6px 0 0; padding-left:20px; }
+.btn.ghost-btn { background:transparent; color:var(--text); border:1px solid var(--line); }
+.tiny { font-size:12px; }
+.tags { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+.filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.filters input { grid-column:1 / -1; width:100%; }
+.filters select { width:100%; }
+label.chk { display:flex; gap:8px; align-items:flex-start; margin-top:10px; color:var(--muted); font-size:14px; }
+.body-wrap { display:flex; gap:12px; justify-content:center; }
+.body-col { flex:1; max-width:240px; text-align:center; }
+.body-svg { width:100%; height:auto; max-height:360px; }
+.bs-base { fill:#18212c; stroke:#2a3646; stroke-width:1; }
+.mz { fill:#2a3b50; stroke:#3f566f; stroke-width:1; cursor:pointer; transition:fill .15s; }
+.mz:hover, .mz:focus { fill:#3d5d72; outline:none; }
+.mz:focus-visible { stroke:var(--accent); stroke-width:2; }
+.mz.on { fill:var(--accent); stroke:var(--accent); }
+@media (max-width:420px) { .filters { grid-template-columns:1fr; } }

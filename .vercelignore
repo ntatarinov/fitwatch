@@ -4,3 +4,6 @@ serve.sh
 docs
 .gitignore
 .vercelignore
+test
+test-ui
+package.json

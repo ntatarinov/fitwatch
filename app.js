@@ -6,12 +6,15 @@
   const PROGRAMS = window.PROGRAMS;
   const Engine = window.Engine;
   const Tree = window.Tree;
+  const LIB_POINTS = 5; // баллы за просмотр видео упражнения из каталога
+  window.Catalog.resolve(PROGRAMS);
 
   // ---------- состояние профиля (localStorage) ----------
-  // done/watched — просмотр видео; log — отметки «Я потренировался» [{date,p,d,points}];
+  // me — анкета (цель, уровень, дни, ограничения, параметры); plan — подобранный план {builtAt, params, days, warnings};
+  // done/watched — просмотр видео; log — отметки «Я потренировался» [{date,p,d,points,t}];
   // checkins — ежедневный отзыв [{date,energy,mood,barrier,liked,disliked,idea}];
-  // food — дневник питания [{date,name,kcal}]
-  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT });
+  // food — дневник питания [{date,name,kcal, p,f,c,grams,nid}] (БЖУ может не быть)
+  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null });
   function load() {
     try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY))); }
     catch (e) { return fresh(); }
@@ -52,7 +55,8 @@
   }
   function totalPoints() {
     const watch = allExercises().reduce((s, { p, e }) => s + (state.done[k(p.id, e.id)] ? e.points : 0), 0);
-    return watch + state.log.reduce((s, l) => s + l.points, 0);
+    const lib = Object.keys(state.done).filter(x => x.startsWith("lib/")).length * LIB_POINTS;
+    return watch + lib + state.log.reduce((s, l) => s + l.points, 0);
   }
   const trainedToday = () => state.log.some(l => l.date === today());
   const todayCheckin = () => state.checkins.find(c => c.date === today()) || null;
@@ -77,6 +81,10 @@
   }
   // Первый ещё не пройденный день основных программ (или первый день).
   function nextDayHref() {
+    if (state.plan && state.plan.days.length) {
+      const n = state.log.filter(l => l.p === "plan" && l.date >= state.plan.builtAt).length;
+      return "#/pd/" + state.plan.days[n % state.plan.days.length].id;
+    }
     for (const p of PROGRAMS.filter(x => x.id !== "stretch")) {
       for (const d of p.days) if (!state.log.some(l => l.p === p.id && l.d === d.id)) return `#/d/${p.id}/${d.id}`;
     }
@@ -108,7 +116,7 @@
 
   function logWorkout(p, d) {
     if (trainedToday()) return false;
-    state.log.push({ date: today(), p: p.id, d: d.id, points: dayPoints(d) });
+    state.log.push({ date: today(), p: p.id, d: d.id, points: dayPoints(d), t: d.title });
     save();
     return true;
   }
@@ -146,7 +154,7 @@
   function buildReport() {
     const pr = profileNow(), lines = [];
     lines.push(`# Отчёт FitWatch — ${state.name}, ${today()}`);
-    lines.push("", "_Принеси этот файл в чат с Claude: разобрать свободные тексты, найти повторяющиеся жалобы и предложить, что изменить в приложении._", "");
+    lines.push("", "_Отправь этот файл тренеру или команде: разобрать свободные тексты, найти повторяющиеся жалобы и предложить, что изменить в приложении._", "");
     lines.push(`Баллы: ${totalPoints()} · Серия: ${streak()} · Тренировок за 7 дней: ${weekCount()} · Тренировок всего: ${state.log.length}`, "");
     lines.push("## Профиль (по правилам движка, приблизительно)");
     if (pr.ready) {
@@ -157,6 +165,10 @@
     } else {
       lines.push(`Недостаточно данных: нужно ещё ${pr.need} отзыв(а).`);
     }
+    if (state.me) {
+      const m = state.me;
+      lines.push("", "## Анкета", `Цель: ${labelOf(window.Planner.GOALS, m.goal)} · уровень ${labelOf(window.Catalog.LEVELS, m.level)} · ${m.days} дн. в неделю по ${m.minutes} мин · ${labelOf(window.Planner.PLACES, m.place)}` + (m.limits.length ? ` · ограничения: ${m.limits.map(l => labelOf(window.Catalog.LIMITS, l)).join(", ")}` : ""));
+    }
     lines.push("", "## Отзывы по дням");
     state.checkins.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).forEach(c => {
       lines.push(`- ${c.date} · энергия ${c.energy}, настроение ${c.mood}, мешает: ${labelOf(window.BARRIERS, c.barrier)}` +
@@ -164,12 +176,12 @@
     });
     if (!state.checkins.length) lines.push("- отзывов нет");
     lines.push("", "## Тренировки");
-    state.log.forEach(l => lines.push(`- ${l.date} · ${l.p}/${l.d} · +${l.points}`));
+    state.log.forEach(l => lines.push(`- ${l.date} · ${l.p === "plan" ? "Мой план: " + (l.t || l.d) : l.p + "/" + l.d} · +${l.points}`));
     if (!state.log.length) lines.push("- тренировок нет");
     lines.push("", "## Питание сегодня");
-    const ft = foodToday();
-    ft.forEach(({ f }) => lines.push(`- ${f.name} · ${f.kcal} ккал`));
-    lines.push(`Итого: ${ft.reduce((s, x) => s + x.f.kcal, 0)} из ${state.kcalGoal} ккал`);
+    const ft = foodToday(), fs = window.Nutrition.sum(ft.map(x => x.f));
+    ft.forEach(({ f }) => lines.push(`- ${f.name} · ${f.kcal} ккал` + (f.p != null ? ` · Б ${f.p} Ж ${f.f} У ${f.c}` : "")));
+    lines.push(`Итого: ${fs.kcal} из ${state.kcalGoal} ккал · Б ${fs.p} Ж ${fs.f} У ${fs.c}`);
     return lines.join("\n");
   }
 
@@ -193,6 +205,17 @@
     return `<div class="hero ${a.kind}"><h2>${esc(a.title)}</h2><p>${esc(a.text)}</p>${act ? `<a class="btn" href="${act[0]}">${act[1]}</a>` : ""}</div>`;
   }
 
+  function planCardHtml() {
+    if (!state.me) return `<div class="card"><b>Твоя цель</b><p class="muted">Расскажи о цели, уровне и ограничениях, и я подберу план тренировок.</p><a class="btn" href="#/me">Подобрать план</a></div>`;
+    const dates = state.plan ? state.plan.days.length : 0;
+    return `<a class="card" href="${nextDayHref()}"><div class="row"><div><b>Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${dates} дн. в неделю</div></div><span class="pill">Дальше →</span></div></a>`;
+  }
+  function meCardHtml() {
+    if (!state.me) return `<div class="card"><b>Моя цель и параметры</b><p class="muted">Пока не заполнено.</p><a class="btn" href="#/me">Заполнить анкету</a></div>`;
+    const m = state.me, C = window.Catalog;
+    return `<div class="card"><b>Моя цель и параметры</b><p>${esc(labelOf(window.Planner.GOALS, m.goal))} · ${esc(labelOf(C.LEVELS, m.level))} · ${m.days} дн. по ${m.minutes} мин · ${esc(labelOf(window.Planner.PLACES, m.place))}</p>
+      <p class="muted">${m.limits.length ? "Ограничения: " + esc(m.limits.map(l => labelOf(C.LIMITS, l)).join(", ")) : "Ограничений не указано"}</p><a class="btn" href="#/me">Изменить</a></div>`;
+  }
   function profileCardHtml() {
     const pr = profileNow();
     if (!pr.ready) {
@@ -209,13 +232,18 @@
 
   function home() {
     app.innerHTML = "<h1>Привет, " + esc(state.name) + "</h1>" +
-      adviceHtml() + statsHtml() + "<h2>Программы</h2><div class='tiles'>" +
+      adviceHtml() + planCardHtml() + statsHtml() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") +
       "</div>";
   }
 
   function programs() {
-    app.innerHTML = "<h1>Тренировки</h1>" + PROGRAMS.map(p =>
+    const planLink = state.plan
+      ? `<a class="card" href="#/plan"><div class="row"><div><b>📅 Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${state.plan.days.length} дн. в неделю</div></div><span class="pill">Открыть</span></div></a>`
+      : `<a class="card" href="#/me"><div class="row"><div><b>📅 Мой план</b><div class="muted">Подберём тренировки под твою цель</div></div><span class="pill">Подобрать</span></div></a>`;
+    app.innerHTML = "<h1>Тренировки</h1>" + planLink +
+      `<a class="card" href="#/library"><div class="row"><div><b>🧍 Каталог упражнений</b><div class="muted">По мышцам, оборудованию и уровню, с моделью тела</div></div><span class="pill">${window.Catalog.EXERCISES.length}</span></div></a>` +
+      "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
       `<a class="card" href="#/p/${p.id}"><div class="row"><div><b>${p.icon || ""} ${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
         <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("");
   }
@@ -294,7 +322,7 @@
     renderCheckin(p, d, justDone);
   }
 
-  function renderCheckin(p, d, justDone) {
+  function renderCheckin(p, d, justDone, rerender) {
     const box = document.getElementById("checkin");
     const pts = dayPoints(d);
     if (justDone) {
@@ -307,7 +335,7 @@
     }
     box.innerHTML = `<button id="done" class="wide">Я потренировался (+${pts})</button>
       <p class="muted">Отмечайте честно: за один календарный день засчитывается одна тренировка.</p>`;
-    document.getElementById("done").onclick = () => { if (logWorkout(p, d)) day(p.id, d.id, true); };
+    document.getElementById("done").onclick = () => { if (logWorkout(p, d)) (rerender || (() => day(p.id, d.id, true)))(); };
   }
 
   let player = null, timer = null;
@@ -322,13 +350,17 @@
     const p = PROGRAMS.find(x => x.id === pid);
     const e = p && exOf(p, eid);
     if (!e) return notFound();
-    const key = k(pid, eid);
-    app.innerHTML = `<a class="back" href="#/p/${p.id}">← ${esc(p.title)}</a><h1>${esc(e.title)}</h1><p class="muted">${esc(e.summary)}</p>
-      <div class="video"><div id="yt"></div></div>
-      <div class="bar"><i id="bar"></i></div>
+    renderExercise({ e, key: k(pid, eid), backHref: `#/p/${p.id}`, backLabel: "← " + p.title, points: e.points, meta: "" });
+  }
+
+  // Страница упражнения: видео (если есть) со счётчиком просмотра, техника. Общая для программ и каталога.
+  function renderExercise({ e, key, backHref, backLabel, points, meta }) {
+    app.innerHTML = `<a class="back" href="${backHref}">${esc(backLabel)}</a><h1>${esc(e.title)}</h1><p class="muted">${esc(e.summary)}</p>${meta || ""}
+      ${e.video ? `<div class="video"><div id="yt"></div></div><div class="bar"><i id="bar"></i></div>` : `<div class="card"><p class="muted">Видео для этого упражнения пока нет. Техника описана ниже.</p></div>`}
       <div class="status" id="status"></div>
       <div class="card"><b>Как выполнять</b><ol>${e.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
         <p><b>Частые ошибки:</b> ${esc(e.mistakes)}</p><p><b>Дозировка:</b> ${esc(e.dose)}</p></div>`;
+    if (!e.video) return;
     const bar = document.getElementById("bar"), status = document.getElementById("status");
     let duration = 0;
 
@@ -336,8 +368,8 @@
       const need = duration ? duration * window.WATCH_THRESHOLD : 0;
       const w = state.watched[key] || 0;
       bar.style.width = (state.done[key] ? 100 : need ? Math.min(100, w / need * 100) : 0) + "%";
-      if (state.done[key]) { status.textContent = "✓ Техника изучена, +" + e.points + " баллов в профиле"; status.className = "status ok"; }
-      else { status.textContent = "Посмотрите видео — небольшие баллы начислятся автоматически (+" + e.points + "). Основные баллы — за тренировку."; status.className = "status"; }
+      if (state.done[key]) { status.textContent = "✓ Техника изучена, +" + points + " баллов в профиле"; status.className = "status ok"; }
+      else { status.textContent = "Посмотрите видео — небольшие баллы начислятся автоматически (+" + points + "). Основные баллы — за тренировку."; status.className = "status"; }
     }
     paint();
 
@@ -389,70 +421,14 @@
     };
   }
 
-  // --- питание ---
-  function food() {
-    const items = foodToday();
-    const total = items.reduce((s, x) => s + x.f.kcal, 0);
-    const goal = state.kcalGoal;
-    const pct = Math.min(100, total / goal * 100);
-    app.innerHTML = `<h1>Питание</h1><p class="muted">Значения ориентировочные. Это дневник, а не диета: общие советы, не медицинские рекомендации.</p>
-      <div class="card"><div class="row"><div><div class="big">${total}</div><div class="muted">ккал из ${goal}</div></div>
-        <div style="text-align:right"><label class="muted">Цель, ккал</label><br><input id="goal" type="number" min="800" max="6000" step="50" value="${goal}" style="width:100px"></div></div>
-        <div class="bar" style="margin-top:10px"><i style="width:${pct}%"></i></div>
-        <p class="muted">${total > goal ? "Больше цели на " + (total - goal) + " ккал — один день ничего не решает." : "Осталось " + (goal - total) + " ккал."}</p></div>
-      <h2>По фото <span class="tag">эксперимент</span></h2>
-      <div class="card" id="photobox">
-        <p class="muted">Сфотографируй блюдо — модель в браузере подскажет, что это. Размер порции выбираешь ты. Модель знает общие продукты (фрукты, овощи, пиццу, бургер), но не знает плов, бешбармак, баурсаки — для них выбери вручную ниже. Фото не отправляется на сервер.</p>
-        <input type="file" id="photo" accept="image/*" capture="environment">
-        <div id="photoout"></div>
-      </div>
-      <h2>Быстро добавить</h2>
-      <div class="chips">${window.FOOD_PRESETS.map((f, i) => `<button class="ghost" data-preset="${i}">${esc(f.name)} · ${f.kcal}</button>`).join("")}</div>
-      <h2>Своё</h2>
-      <form id="ff" class="card row"><input name="name" placeholder="Что съел" maxlength="60" style="flex:1" required><input name="kcal" type="number" min="1" max="5000" placeholder="ккал" style="width:90px" required><button type="submit">+</button></form>
-      <h2>Сегодня</h2>
-      ${items.length ? items.map(({ f, i }) => `<div class="card row"><span>${esc(f.name)}</span><span><b>${f.kcal}</b> <button class="ghost" data-del="${i}">✕</button></span></div>`).join("") : "<p class='muted'>Пока ничего не добавлено.</p>"}`;
-    app.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => { const f = window.FOOD_PRESETS[+b.dataset.preset]; addFood(f.name, f.kcal); food(); });
-    app.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { state.food.splice(+b.dataset.del, 1); save(); food(); });
-    document.getElementById("ff").onsubmit = ev => { ev.preventDefault(); const f = ev.target; if (addFood(f.name.value, f.kcal.value)) food(); };
-    document.getElementById("photo").onchange = ev => photoFlow(ev.target.files && ev.target.files[0]);
-    document.getElementById("goal").onchange = ev => { const v = Math.round(Number(ev.target.value)); if (v >= 800 && v <= 6000) { state.kcalGoal = v; save(); food(); } };
-  }
-
-  // Фото блюда → подсказка по модели → пользователь выбирает порцию и подтверждает.
-  const PORTIONS = [["0.5", "½ порции"], ["1", "1 порция"], ["1.5", "1½ порции"], ["2", "2 порции"]];
-  async function photoFlow(file) {
-    const out = document.getElementById("photoout");
-    if (!file) { out.innerHTML = ""; return; }
-    if (!/^image\//.test(file.type)) { out.innerHTML = "<p class='status'>Нужен файл-картинка.</p>"; return; }
-    const url = URL.createObjectURL(file);
-    out.innerHTML = `<img id="pimg" src="${url}" alt="фото блюда" style="width:100%;max-height:260px;object-fit:contain;border-radius:10px;margin-top:10px"><div class="status" id="pstat">Загружаю модель (около 15 МБ, один раз) и распознаю…</div><div id="pres"></div>`;
-    const img = document.getElementById("pimg"), stat = document.getElementById("pstat"), res = document.getElementById("pres");
-    try {
-      if (!img.complete) await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error("не удалось открыть картинку")); });
-      const { preds, matches } = await window.Photo.recognize(img);
-      if (!document.getElementById("pres")) return; // пользователь ушёл со страницы
-      if (!matches.length) {
-        stat.textContent = "Не нашёл знакомой еды (модель видит: " + preds.slice(0, 2).map(p => p.className.split(",")[0]).join(", ") + "). Выбери блюдо вручную ниже.";
-        return;
-      }
-      stat.textContent = "Возможно, это:";
-      res.innerHTML = matches.slice(0, 3).map((m, i) => `<div class="card row"><div><b>${esc(m.food.name)}</b><div class="muted">${m.food.kcal} ккал · уверенность ${Math.round(m.prob * 100)}%</div></div>
-        <div><select data-por="${i}">${PORTIONS.map(([v, l]) => `<option value="${v}" ${v === "1" ? "selected" : ""}>${l}</option>`).join("")}</select> <button data-add="${i}">Добавить</button></div></div>`).join("");
-      res.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
-        const i = +b.dataset.add, k2 = Number(res.querySelector(`[data-por="${i}"]`).value);
-        addFood(matches[i].food.name, Math.round(matches[i].food.kcal * k2));
-        food();
-      });
-    } catch (e) {
-      stat.textContent = "Не удалось распознать (" + (e && e.message ? e.message : "ошибка") + "). Нужен интернет для загрузки модели. Выбери блюдо вручную ниже.";
-    }
-  }
+  // --- питание: страница в pages.js ---
+  function food() { PAGES.food(FW); }
 
   // --- профиль ---
   function profile() {
     const doneVideos = allExercises().filter(({ p, e }) => state.done[k(p.id, e.id)]);
     const history = state.log.slice().reverse().map(l => {
+      if (l.p === "plan") return `<li>${esc(l.date)} · Мой план · ${esc(l.t || l.d)} · +${l.points}</li>`;
       const p = PROGRAMS.find(x => x.id === l.p), d = p && p.days.find(x => x.id === l.d);
       return `<li>${esc(l.date)} · ${esc(p ? p.title : l.p)} · ${esc(d ? d.title : l.d)} · +${l.points}</li>`;
     }).join("");
@@ -460,10 +436,11 @@
       <div class="card"><div class="muted">Баллы</div><div class="big">${totalPoints()}</div></div>
       ${statsHtml()}
       ${profileCardHtml()}
+      ${meCardHtml()}
       <div class="card"><label class="muted">Имя</label><div class="row" style="margin-top:6px"><input id="name" value="${esc(state.name)}" maxlength="30" style="flex:1"><button id="saveName">Сохранить</button></div></div>
       <div class="card"><b>Тренировки (${state.log.length})</b>${history ? "<ul>" + history + "</ul>" : "<p class='muted'>Пока нет — откройте программу и отметьте первую тренировку.</p>"}</div>
       <div class="card"><b>Изучена техника (${doneVideos.length})</b>${doneVideos.length ? "<ul>" + doneVideos.map(({ p, e }) => `<li>${esc(e.title)} · ${esc(p.title)} · +${e.points}</li>`).join("") + "</ul>" : "<p class='muted'>Пока нет видео.</p>"}</div>
-      <div class="card"><b>Выгрузка для разбора</b><p class="muted">Отчёт с отзывами, профилем и тренировками. Принеси его в чат с Claude — я разберу свободные тексты.</p>
+      <div class="card"><b>Выгрузка для разбора</b><p class="muted">Отчёт с отзывами, профилем и тренировками. Отправь его тренеру или команде: из него видно свободные тексты и повторяющиеся жалобы.</p>
         <div class="row"><button id="copy">Скопировать</button><button id="dl" class="ghost">Скачать .md</button></div><textarea id="rep" rows="6" readonly style="width:100%;margin-top:10px"></textarea></div>
       <div class="card"><b>Для демонстрации</b><p class="muted">Заполнить двухнедельными демо-данными, чтобы сразу показать профиль и советы. Текущие данные будут заменены.</p>
         <div class="row"><button id="demo" class="ghost">Загрузить демо</button><button class="ghost" id="reset">Сбросить прогресс</button></div></div>`;
@@ -482,7 +459,7 @@
     };
     document.getElementById("saveName").onclick = () => { state.name = document.getElementById("name").value.trim() || "Гость"; save(); profile(); };
     document.getElementById("demo").onclick = () => { if (confirm("Заменить текущие данные демо-данными?")) { loadDemo(); profile(); } };
-    document.getElementById("reset").onclick = () => { if (confirm("Сбросить все баллы и прогресс?")) { state = Object.assign(fresh(), { name: state.name }); save(); profile(); } };
+    document.getElementById("reset").onclick = () => { if (confirm("Сбросить все баллы и прогресс?")) { state = Object.assign(fresh(), { name: state.name, me: state.me, plan: state.plan }); save(); profile(); } };
   }
 
   function notFound() { app.innerHTML = "<h1>Не найдено</h1><a class='back' href='#/'>← На главную</a>"; }
@@ -508,16 +485,24 @@
     if (a === "p") program(b);
     else if (a === "d") day(b, c);
     else if (a === "e") exercise(b, c);
+    else if (a === "me") PAGES.me(FW);
+    else if (a === "plan") PAGES.plan(FW);
+    else if (a === "pd") PAGES.planDay(FW, b);
+    else if (a === "library") PAGES.library(FW, b);
+    else if (a === "x") PAGES.exercise(FW, b);
     else if (a === "checkin") checkin();
     else if (a === "food") food();
     else if (a === "profile") profile();
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", food: "food", trainer: "trainer", checkin: "trainer", profile: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "trainer", checkin: "trainer", profile: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     window.scrollTo(0, 0);
   }
+  // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
+  const PAGES = window.PAGES;
+  const FW = { app, esc, today, k, get state() { return state; }, save, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
   window.addEventListener("hashchange", route);
   renderBadge();
   route();
