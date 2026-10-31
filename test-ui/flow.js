@@ -157,10 +157,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok(!/Claude/.test(text(w, "main")), "в профиле нет упоминания Claude");
 
   // 7b. звук и достижения
-  ok(w.document.getElementById("snd").getAttribute("aria-pressed") === "true", "звук по умолчанию включён");
-  click(w, w.document.getElementById("snd"));
-  ok(w.localStorage.getItem("fitwatch.sound") === "off" && w.document.getElementById("snd").getAttribute("aria-pressed") === "false", "звук выключается и запоминается");
-  click(w, w.document.getElementById("snd"));
+  ok(!w.document.getElementById("snd"), "в шапке кнопки звука нет: она в настройках");
+  ok($(w, "[data-sound-toggle]").getAttribute("aria-checked") === "true", "звук по умолчанию включён");
+  click(w, $(w, "[data-sound-toggle]")); await tick(w, 20);
+  ok(w.localStorage.getItem("fitwatch.sound") === "off" && $(w, "[data-sound-toggle]").getAttribute("aria-checked") === "false", "звук выключается в настройках и запоминается");
+  click(w, $(w, "[data-sound-toggle]")); await tick(w, 20);
   ok(w.localStorage.getItem("fitwatch.sound") === "on", "звук включается обратно");
   await go(w, "#/profile");
   ok(/Достижения/.test(text(w, "main")) && $$(w, ".bd.got").length >= 2 && $$(w, ".bd.lock").length >= 5, "профиль: открытые и закрытые достижения");

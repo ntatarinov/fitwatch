@@ -100,9 +100,10 @@
     const coach = prof && prof.status === "approved";
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Тренеры</h1>${window.Guide.tip("trainers")}${P.ideaChips(["A7", "K4"])}
       <div class="card warn"><p class="muted" style="margin:0">${DISCLAIMER}</p></div>
-      ${coach ? '<a class="btn" href="#/coach">Клиенты и дашборды</a>' : ""}
+      ${coach ? `<a class="card row-link" href="#/coach"><span class="oi">${window.Icons.svg("users", 22)}</span><div class="rl-tx"><b>Кабинет тренера</b><div class="muted">Клиенты, дашборды, заметки</div></div><span class="pill">Открыть</span></a>` : ""}
+      <a class="card row-link" href="#/coach/demo"><span class="oi">${window.Icons.svg("activity", 22)}</span><div class="rl-tx"><b>Пример кабинета тренера</b><div class="muted">Посмотреть, как выглядит панель: сводка и дашборды на выдуманных клиентах</div></div><span class="chev" aria-hidden="true">›</span></a>
       <h2>Мои тренеры</h2>${myLinks}<h2>Выбрать тренера</h2><div class="status" id="terr" role="alert"></div>${trainers}
-      <h2>Стать тренером</h2>${prof ? `<div class="card"><p>Ваша заявка: <b>${{ pending: "на проверке", approved: "подтверждена", rejected: "отклонена" }[prof.status]}</b>.</p>${prof.status === "rejected" ? "<p class='muted'>Можно исправить описание и подать снова.</p>" : ""}</div>` : ""}
+      <h2 id="become">Стать тренером</h2>${coach ? "" : '<p class="muted">Подайте заявку: после подтверждения администратором в меню появится вкладка «Клиенты» с кабинетом.</p>'}${prof ? `<div class="card"><p>Ваша заявка: <b>${{ pending: "на проверке", approved: "подтверждена", rejected: "отклонена" }[prof.status]}</b>.</p>${prof.status === "rejected" ? "<p class='muted'>Можно исправить описание и подать снова.</p>" : ""}</div>` : ""}
       ${coach ? "" : `<form id="apply" class="card"><label><b>О себе</b></label><textarea name="bio" rows="3" maxlength="1000" placeholder="Опыт, образование, с кем работаете (от 20 символов)">${prof ? esc(prof.bio) : ""}</textarea>
         <label><b>Специализация</b></label><input name="spec" maxlength="200" placeholder="Например: сила, похудение, растяжка" value="${prof ? esc(prof.specialties) : ""}" style="width:100%">
         <div class="status" id="aerr" role="alert"></div><button type="submit">Отправить заявку</button><p class="muted tiny">Заявку подтверждает администратор.</p></form>`}`;

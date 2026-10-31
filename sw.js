@@ -1,7 +1,7 @@
 // Сервис-воркер FitWatch: открывает приложение без сети и ускоряет запуск.
 // Правила безопасности: запросы к /api/ и чужие адреса он не трогает вообще, ничего личного не кэширует.
 // Статика берётся сначала из сети (всегда свежая версия), из кэша только если сети нет.
-const VERSION = "fw-0.8.1";
+const VERSION = "fw-0.8.2";
 const SHELL = [
   "/", "/index.html", "/style.css", "/manifest.webmanifest",
   "/data.js", "/catalog.js", "/nutrition.js", "/planner.js", "/body.js", "/ideas.js", "/achievements.js", "/fx.js", "/engine.js", "/tree.js",

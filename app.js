@@ -84,11 +84,17 @@
       if (!up) X.play("badge");
     }, 700 * (i + (up ? 1 : 0))));
   }
+  // Имя в шапке и приветствии: после входа имя из аккаунта, иначе то, что задано на этом устройстве.
+  function displayName() {
+    const a = window.Account.state;
+    return a.status === "user" && a.user && a.user.name ? a.user.name : state.name;
+  }
   // Имя пользователя попадает в страницу только как текст.
   function renderBadge() {
     badge.innerHTML = '<span class="b-ic"></span><span class="b-tx"></span>';
     badge.firstChild.innerHTML = window.Icons.svg("star", 16);
-    badge.lastChild.textContent = totalPoints() + " · " + state.name;
+    const a = window.Account.state;
+    badge.lastChild.textContent = a.status === "user" ? totalPoints() + " · " + displayName() : String(totalPoints());
   }
 
   function profileNow() {
@@ -329,19 +335,21 @@
   }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
-    const head = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
+    const head = `<div class="greet"><h1>Привет, ${esc(displayName())}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
     const Gd = window.Guide, pro = Gd.isPro();
     const st = Gd.steps(stepsCtx());
     const steps = !pro && !Gd.stepsHidden() ? PAGES.stepsCard(st, false) : "";
     // Пока нет плана, ведёт чек-лист: совет дня с отзывом или тренировкой новичка только запутал бы.
     const advice = pro || state.plan || Gd.stepsHidden() ? adviceHtml() : "";
-    const install = !pro && !Gd.installHidden() && window.Pwa ? window.Pwa.card({ dismissible: true }) : "";
+    const install = !Gd.installHidden() && window.Pwa ? window.Pwa.card({ dismissible: true }) : "";
+    const anon = window.Account.state.status === "anon";
+    const loginRow = anon ? `<a class="card row-link login-card" href="#/account"><span class="oi">${ic("user", 22)}</span><div class="rl-tx"><b>Войти или зарегистрироваться</b><div class="muted">Сохраните прогресс, участвуйте в рейтинге</div></div><span class="pill">Войти</span></a>` : "";
     const food = Gd.show("food") ? nutritionCardHtml() : "";
     const sleep = Gd.show("sleep") ? sleepCardHtml() : "";
     const body = Gd.show("progress") ? linkRow("#/body", "scale", "Вес и рост", "История замеров и график", "") : "";
-    const proBlock = pro ? PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
-      PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${ic(p.icon || "dumbbell", 30)}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : install + PAGES.proTeaser();
-    app.innerHTML = head + steps + advice + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
+    const proBlock = pro ? (anon ? "" : PAGES.accountCard(FW)) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
+      PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${ic(p.icon || "dumbbell", 30)}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : PAGES.proTeaser();
+    app.innerHTML = head + loginRow + install + steps + advice + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
     animateBars();
   }
 
@@ -553,10 +561,14 @@
     }).join("");
     const pro = window.Guide.isPro();
     const installCard = window.Pwa ? window.Pwa.card() : "";
+    const acct = window.Account.state, isTrainer = acct.status === "user" && acct.user && acct.user.isTrainer;
+    const trainerRow = isTrainer ? linkRow("#/coach", "users", "Кабинет тренера", "Клиенты, дашборды и заметки", "Открыть")
+      : linkRow("#/trainers", "users", "Я тренер", "Подать заявку или посмотреть пример кабинета", "");
     app.innerHTML = `<h1>Профиль</h1>
+      ${PAGES.accountCard(FW)}
+      ${trainerRow}
       ${PAGES.settingsCard()}
       ${installCard}
-      ${PAGES.accountCard(FW)}
       ${pro ? PAGES.ideasCard() : ""}
       <div class="card"><div class="muted">Баллы</div><div class="big">${totalPoints()}</div></div>
       ${statsHtml()}
@@ -627,7 +639,7 @@
     else if (a === "pp") PAGES.premiumProgram(FW, b);
     else if (a === "ppd") PAGES.premiumDay(FW, b, c);
     else if (a === "trainers") PAGES.trainers(FW);
-    else if (a === "coach") PAGES.coach(FW);
+    else if (a === "coach") PAGES.coach(FW, b);
     else if (a === "client") PAGES.clientView(FW, b);
     else if (a === "chat") PAGES.chat(FW, b);
     else if (a === "admin") PAGES.admin(FW);
@@ -641,7 +653,7 @@
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "programs", client: "programs", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     if (keepScroll !== true) window.scrollTo(0, 0);
   }
@@ -656,13 +668,19 @@
   const PAGES = window.PAGES;
   PAGES.stepsCtx = stepsCtx;
   const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
-  const snd = document.getElementById("snd");
-  const paintSnd = () => { const on = window.FX.enabled(); snd.innerHTML = window.Icons.svg(on ? "volume" : "mute", 20); snd.setAttribute("aria-pressed", String(on)); snd.title = on ? "Звук включён" : "Звук выключен"; };
-  snd.onclick = () => { window.FX.setEnabled(!window.FX.enabled()); paintSnd(); window.FX.play("tap"); };
-  paintSnd();
   window.addEventListener("hashchange", route);
   // Изменился вход/выход: обновляем страницы, где виден аккаунт. Без сервера приложение работает как раньше.
-  window.Account.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "account", "rating", "body"].includes(a)) route(); });
+  // Вкладка «Клиенты» видна только подтверждённым тренерам.
+  const coachTab = document.getElementById("coachtab");
+  const loginBtn = document.getElementById("loginbtn");
+  const syncAccount = () => {
+    const s = window.Account.state;
+    coachTab.hidden = !(s.status === "user" && s.user && s.user.isTrainer);
+    loginBtn.hidden = s.status === "user" || s.status === "unknown"; // «Войти» всегда на виду, пока не вошёл
+    renderBadge();
+  };
+  window.Account.onChange(() => { syncAccount(); const a = location.hash.split("/")[1] || ""; if (["", "profile", "account", "rating", "body", "coach", "client"].includes(a)) route(true); });
+  syncAccount();
   window.Account.refresh();
   renderBadge();
   // Режим и гайды: переключение перерисовывает страницу; приветствие показывается один раз.

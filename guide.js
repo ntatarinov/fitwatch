@@ -180,6 +180,17 @@
     { id: "mode", title: "Как показывать?", text: "Режим можно сменить в любой момент кнопкой вверху.", art: "" },
   ];
 
+  // Слайд «Установи как приложение»: есть только там, где установку можно предложить (кнопка в Chrome и Android, инструкция на iPhone).
+  function installSlide(status) {
+    const ios = status === "ios";
+    return { id: "install", title: "Установи как приложение", status,
+      text: ios ? "Нажми «Поделиться» в Safari и выбери «На экран Домой». Значок появится рядом с остальными приложениями."
+        : "Откроется с экрана телефона как обычное приложение: без адресной строки, быстрее и даже без сети.",
+      art: `<div class="ob-app"><img src="/icons/icon-192.png" alt="" width="104" height="104"><span class="ob-dl">${icon(ios ? "share" : "download")}</span></div>` };
+  }
+  // Список слайдов зависит от того, можно ли сейчас предложить установку: второй слайд появляется, когда браузер это разрешил.
+  const slidesFor = pwaStatus => (pwaStatus === "prompt" || pwaStatus === "ios" ? [SLIDES[0], installSlide(pwaStatus)].concat(SLIDES.slice(1)) : SLIDES.slice());
+
   // Окно приветствия. Возвращает управление для тестов; onDone(mode) вызывается один раз.
   function showOnboarding(doc, opts) {
     const o = opts || {};
@@ -192,8 +203,9 @@
     doc.body.classList.add("ob-lock");
     const again = read().onboarded; // повторное приветствие: стоят текущие настройки, а «Пропустить» и Esc их не меняют
     const picked = new Set(again ? modules() : ["food"]); // впервые: питание отмечено заранее
-    let i = 0, done = false, x0 = null;
-    const last = () => i === SLIDES.length - 1;
+    let i = 0, done = false, x0 = null, curId = "hello";
+    const list = () => slidesFor(root.Pwa ? root.Pwa.status() : "none");
+    const last = () => i === list().length - 1;
     const sfx = () => { try { root.FX && root.FX.play("tap"); } catch (e) { /* звук необязателен */ } };
 
     function finish(m, mods) {
@@ -213,26 +225,38 @@
       <button type="button" class="ob-mode" data-pick="lite"><span class="oi">${icon("leaf")}</span><span class="ot"><b>Lite</b><small>Только нужное. Подсказки на страницах и первые шаги</small></span></button>
       <button type="button" class="ob-mode" data-pick="pro"><span class="oi">${icon("bolt")}</span><span class="ot"><b>Pro</b><small>Без подсказок, больше данных: аналитика, идеи команды, выгрузка</small></span></button></div>`;
     function draw() {
-      const s = SLIDES[i];
+      const L = list();
+      const at = L.findIndex(x => x.id === curId);
+      i = at >= 0 ? at : Math.min(i, L.length - 1);   // список мог измениться (появилась установка): остаёмся на том же слайде
+      const s = L[i];
+      curId = s.id;
       const body = s.id === "interests" ? interestsHtml() : s.id === "mode" ? modeHtml() : `<div class="ob-art">${s.art}</div>`;
+      const installBtn = s.id === "install" && s.status === "prompt" ? `<button type="button" class="ob-install" data-install-now>Установить</button>` : "";
       el.innerHTML = `<div class="ob-card" key="${s.id}">
         <button type="button" class="ob-skip" data-skip>${last() ? "" : "Пропустить"}</button>
         ${body}
-        <h2 id="ob-title">${s.title}</h2><p>${s.text}</p>
-        <div class="ob-dots" aria-hidden="true">${SLIDES.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
+        <h2 id="ob-title">${s.title}</h2><p>${s.text}</p>${installBtn}
+        <div class="ob-dots" aria-hidden="true">${L.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
         <div class="ob-nav">${i > 0 ? `<button type="button" class="ghost" data-prev>Назад</button>` : "<span></span>"}${last() ? "" : `<button type="button" data-next>Дальше</button>`}</div>
-        <div class="ob-step" aria-live="polite">Шаг ${i + 1} из ${SLIDES.length}</div></div>`;
+        <div class="ob-step" aria-live="polite">Шаг ${i + 1} из ${L.length}</div>
+        <button type="button" class="ob-login" data-login>Уже есть аккаунт? Войти</button></div>`;
       const first = el.querySelector("[data-next],[data-pick]");
       if (first && first.focus) first.focus();
     }
-    function go(d) { const n = i + d; if (n < 0 || n >= SLIDES.length) return; i = n; sfx(); draw(); }
+    function go(d) { const n = i + d, L = list(); if (n < 0 || n >= L.length) return; i = n; curId = L[n].id; sfx(); draw(); }
     el.addEventListener("click", ev => {
       const t = ev.target.closest ? ev.target.closest("button") : null;
       if (!t) return;
       if (t.hasAttribute("data-next")) go(1);
       else if (t.hasAttribute("data-prev")) go(-1);
       else if (t.hasAttribute("data-skip")) { sfx(); finish(again ? undefined : "lite"); }
-      else if (t.dataset.interest) {
+      else if (t.hasAttribute("data-login")) { sfx(); finish(again ? undefined : "lite"); try { root.location.hash = "#/account"; } catch (e) { /* без адреса просто закрываем */ } }
+      else if (t.hasAttribute("data-install-now")) {
+        sfx();
+        // После показа окна установки слайд исчезает из списка (предлагать больше нечего): следующий запоминаем заранее.
+        const L0 = list(), nextId = (L0[i + 1] || L0[i]).id;
+        Promise.resolve(root.Pwa && root.Pwa.install()).then(() => { if (!done) { curId = nextId; draw(); } });
+      } else if (t.dataset.interest) {
         const id = t.dataset.interest, on = !picked.has(id);
         if (on) picked.add(id); else picked.delete(id);
         t.classList.toggle("on", on); t.setAttribute("aria-checked", String(on));
@@ -261,10 +285,10 @@
     }
     doc.addEventListener("keydown", onKey);
     draw();
-    return { go, finish, get index() { return i; }, get slides() { return SLIDES.length; }, get picked() { return [...picked]; } };
+    return { go, finish, get index() { return i; }, get slides() { return list().length; }, get picked() { return [...picked]; } };
   }
 
-  const api = { KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, welcomeEnabled, setWelcome, shouldWelcome, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
+  const api = { KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, slidesFor, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, welcomeEnabled, setWelcome, shouldWelcome, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
   root.Guide = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -7,12 +7,13 @@ const ROOT = path.join(__dirname, "..");
 
 function load(prefs, opts) {
   let html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-  html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + (src === "account.js" && opts && opts.loggedIn ? ";Account.state.status='user';Account.state.user={name:'Тест'};Account.state.stats={points:0,streak:0};Account.refresh=async()=>{};" : "") + "</script>");
+  html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + (src === "account.js" && opts && (opts.loggedIn || opts.anon) ? (opts.loggedIn ? ";Account.state.status='user';Account.state.user={name:'Тест',isTrainer:" + (opts.trainer ? "true" : "false") + "};Account.state.stats={points:0,streak:0};" : ";Account.state.status='anon';") + "Account.refresh=async()=>{};" : "") + "</script>");
   const errors = [], vc = new VirtualConsole();
   vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0])); vc.on("error", e => errors.push(String(e)));
   const dom = new JSDOM(html, { url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc, beforeParse(w) {
     w.scrollTo = () => {}; w.HTMLCanvasElement.prototype.getContext = () => null;
     if (prefs) w.localStorage.setItem("fitwatch.ui", JSON.stringify(prefs));
+    if (opts && opts.ua) Object.defineProperty(w.navigator, "userAgent", { value: opts.ua, configurable: true });
   } });
   dom.window.confirm = () => true;
   return { w: dom.window, errors };
@@ -62,7 +63,7 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   ok(w.document.body.dataset.mode === "lite" && /Lite/.test(text(w, "[data-modebtn]")), "режим виден на странице и в кнопке вверху");
   ok(w.document.body.dataset.hide === "progress rating trainers", "скрытые разделы отмечены на странице: " + w.document.body.dataset.hide);
   ok(!!$(w, '[data-t="rating"]') && $(w, '[data-t="rating"]').dataset.mod === "rating" && $(w, '[data-t="food"]').dataset.mod === "food", "вкладки «Рейтинг» и «Питание» привязаны к своим разделам");
-  ok($$(w, "#tabbar svg").length === 5, "у вкладок линейные значки, не эмодзи");
+  ok($$(w, "#tabbar a:not([hidden]) svg").length === 5 && $(w, "#coachtab").hidden === true, "у вкладок линейные значки, вкладка «Клиенты» скрыта у не-тренера");
 
   // 2. Главная в Lite
   await go(w, "#/");
@@ -232,7 +233,94 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   click(w, $(w, "[data-welcome-toggle]")); await tick(20);
   ok(ui(w).welcomeOff === false, "и включено обратно");
 
-  const all = errors.concat(second.errors, again.errors, off.errors, logged.errors, third.errors, old.errors);
+  // 12. Вход на виду
+  const guest = load({ mode: "lite", onboarded: true, welcomeOff: true }, { anon: true });
+  await tick(60);
+  const gl = $(guest.w, "#loginbtn");
+  ok(!!gl && gl.hidden === false && /Войти/.test(gl.textContent) && gl.getAttribute("href") === "#/account", "гость: в шапке кнопка «Войти»");
+  ok(/^\d+$/.test(text(guest.w, "#badge").trim()) && !/Гость/.test(text(guest.w, "header")), "гость: в шапке только баллы, слова «Гость» нет");
+  ok(!$(guest.w, "#snd") && $$(guest.w, "header .icon-btn").length === 1, "в шапке один значок (помощь), звук убран");
+  ok(!!$(guest.w, "main a.login-card") && /Войти или зарегистрироваться/.test(text(guest.w, "main a.login-card")), "гость: на главной сверху карточка входа");
+  await go(guest.w, "#/profile");
+  ok(/Войти или зарегистрироваться/.test(text(guest.w, "main > h1 + .card")), "гость: карточка входа первая в профиле, выше настроек");
+  const guestPro = load({ mode: "pro", onboarded: true, welcomeOff: true }, { anon: true });
+  await tick(60);
+  ok($$(guestPro.w, "main a").filter(a => /Войти или зарегистрироваться/.test(a.textContent)).length === 1, "в Pro карточка входа одна, без дубля");
+  const user = load({ mode: "lite", onboarded: true, welcomeOff: true }, { loggedIn: true });
+  await tick(60);
+  ok($(user.w, "#loginbtn").hidden === true && /Тест/.test(text(user.w, "#badge")) && !/Гость/.test(text(user.w, "#badge")), "после входа кнопка «Войти» скрыта, в шапке имя из аккаунта");
+  ok(/Привет, Тест/.test(text(user.w, "h1")), "приветствие на главной тоже по имени из аккаунта");
+  ok($(user.w, "#coachtab").hidden === true, "обычному пользователю вкладки «Клиенты» нет");
+  await go(user.w, "#/profile");
+  ok(!/Войти или зарегистрироваться/.test(text(user.w, "main")), "после входа предложения войти в профиле нет");
+  const coach = load({ mode: "lite", onboarded: true, welcomeOff: true }, { loggedIn: true, trainer: true });
+  await tick(60);
+  ok($(coach.w, "#coachtab").hidden === false && $(coach.w, "#coachtab").getAttribute("href") === "#/coach" && /Клиенты/.test(text(coach.w, "#coachtab")), "подтверждённому тренеру в меню видна вкладка «Клиенты»");
+  await go(coach.w, "#/profile");
+  ok($$(coach.w, "main a.row-link").some(a => /Кабинет тренера/.test(a.textContent) && a.getAttribute("href") === "#/coach"), "в профиле тренера есть строка «Кабинет тренера»");
+  await go(guest.w, "#/profile");
+  ok($$(guest.w, "main a.row-link").every(a => !/Кабинет тренера/.test(a.textContent)), "обычному пользователю строки «Кабинет тренера» нет");
+
+  // 13. Пример кабинета тренера
+  await go(guest.w, "#/trainers");
+  ok(true, "переход к странице тренеров");
+  await go(guest.w, "#/coach/demo");
+  ok(await (async () => { for (let k = 0; k < 20 && !$(guest.w, ".demo-banner"); k++) await tick(20); return !!$(guest.w, ".demo-banner"); })(), "пример кабинета открывается без заявки тренера и без входа");
+  ok(/Клиенты/.test(text(guest.w, "h1")) && $$(guest.w, ".client").length === 4 && $$(guest.w, ".kpis .kpi").length === 4, "в примере четыре клиента и четыре показателя");
+  ok(/Пример кабинета/.test(text(guest.w, ".demo-banner")) && /выдуманы/.test(text(guest.w, ".demo-banner")), "подписано, что клиенты выдуманы");
+  ok($$(guest.w, ".client .cl-act button[disabled]").length === 4 && $$(guest.w, '[data-act][disabled]').length === 2, "в примере кнопки чата, принять и отклонить отключены");
+  ok(!!$(guest.w, ".card svg.bars:not(.mini)") && $$(guest.w, ".client .cl-lock").length === 1 && $$(guest.w, ".client .flag").length >= 2, "график, замок у клиента без доступа и пометки внимания на месте");
+  click(guest.w, $$(guest.w, "#cfilters [data-f]").find(b => b.dataset.f === "attention"));
+  await tick(30);
+  ok($$(guest.w, ".client").length >= 1 && $$(guest.w, ".client").every(c => c.querySelector(".flag")), "фильтр «Внимание» оставляет только клиентов с пометками");
+  const dem = $$(guest.w, ".client a.cl-main")[0].getAttribute("href");
+  ok(/^#\/client\/demo-\d+$/.test(dem), "карточка ведёт на дашборд примера");
+  await go(guest.w, dem);
+  ok(await (async () => { for (let k = 0; k < 20 && !$(guest.w, ".kpis"); k++) await tick(20); return !!$(guest.w, ".kpis"); })(), "дашборд клиента из примера открылся");
+  ok($$(guest.w, ".kpis .kpi").length === 4 && !!$(guest.w, "svg.bars") && !!$(guest.w, ".demo-banner") && $(guest.w, "a.back").getAttribute("href") === "#/coach/demo", "в нём показатели, график, подпись «пример» и возврат в пример");
+  click(guest.w, $(guest.w, "#nsave"));
+  await tick(30);
+  ok(/не сохраняется/.test(text(guest.w, "#nstat")), "заметка в примере не сохраняется и честно об этом говорит");
+  await go(guest.w, "#/client/demo-999");
+  ok(await (async () => { for (let k = 0; k < 20 && !/Не найдено/.test(text(guest.w, "main")); k++) await tick(20); return /Не найдено/.test(text(guest.w, "main")); })(), "несуществующий клиент примера: «Не найдено»");
+  await go(guest.w, "#/client/demo-1; alert(1)");
+  ok(/Войди|Не найдено/.test(text(guest.w, "main")) && !$(guest.w, ".kpis"), "странный адрес вида «demo-1; alert(1)» не открывает клиента и не выполняется");
+
+  // 14. Вход из приветствия и установка в приветствии
+  const w1 = load(null, { anon: true });
+  await tick(80);
+  ok(!!$(w1.w, "[data-login]") && /Уже есть аккаунт/.test(text(w1.w, "[data-login]")), "в приветствии есть «Уже есть аккаунт? Войти»");
+  click(w1.w, $(w1.w, "[data-login]"));
+  await tick(30);
+  ok(!$(w1.w, "#onboard") && w1.w.location.hash === "#/account" && ui(w1.w).onboarded === true, "кнопка закрывает приветствие и открывает вход");
+  const w2 = load(null, { anon: true });
+  await tick(80);
+  const ev2 = new w2.w.Event("beforeinstallprompt", { cancelable: true });
+  let prompted2 = false; ev2.prompt = () => { prompted2 = true; }; ev2.userChoice = Promise.resolve({ outcome: "accepted" });
+  w2.w.dispatchEvent(ev2);
+  ok(/Шаг 1 из 5/.test(text(w2.w, ".ob-step")), "до разрешения браузера слайдов пять");
+  click(w2.w, $(w2.w, "[data-next]"));
+  ok(/Установи как приложение/.test(text(w2.w, "#ob-title")) && !!$(w2.w, "[data-install-now]") && /Шаг 2 из 6/.test(text(w2.w, ".ob-step")), "когда установка доступна, вторым слайдом предложение установить (всего шесть)");
+  ok(!!$(w2.w, ".ob-app img") && $(w2.w, ".ob-app img").getAttribute("src") === "/icons/icon-192.png", "на слайде иконка приложения");
+  click(w2.w, $(w2.w, "[data-install-now]"));
+  await tick(40);
+  ok(prompted2 && /Выбери цель/.test(text(w2.w, "#ob-title")), "кнопка «Установить» показала окно браузера и после согласия слайды пошли дальше");
+  const w3 = load(null, { anon: true, ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" });
+  await tick(80);
+  click(w3.w, $(w3.w, "[data-next]"));
+  ok(/Установи как приложение/.test(text(w3.w, "#ob-title")) && /На экран Домой/.test(text(w3.w, ".ob-card")) && !$(w3.w, "[data-install-now]"), "на iPhone вместо кнопки инструкция «На экран Домой»");
+  const w4 = load(null, { anon: true });
+  await tick(80);
+  click(w4.w, $(w4.w, "[data-next]"));
+  ok(!/Установи/.test(text(w4.w, "#ob-title")), "если установка недоступна, слайда нет");
+  const w5 = load({ mode: "lite", onboarded: true, welcomeOff: true }, { anon: true });
+  await tick(60);
+  const ev5 = new w5.w.Event("beforeinstallprompt", { cancelable: true }); ev5.prompt = () => {}; ev5.userChoice = Promise.resolve({ outcome: "dismissed" });
+  w5.w.dispatchEvent(ev5);
+  await tick(20);
+  ok(!!$(w5.w, "main #installcard [data-install]") && $$(w5.w, "main > *").indexOf($(w5.w, "main #installcard")) <= 2, "на главной карточка «Установить» стоит в самом верху");
+
+  const all = errors.concat(second.errors, again.errors, off.errors, logged.errors, third.errors, old.errors, guest.errors, guestPro.errors, user.errors, coach.errors, w1.errors, w2.errors, w3.errors, w4.errors, w5.errors);
   ok(all.length === 0, "ошибок в консоли нет " + all.join("; "));
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);

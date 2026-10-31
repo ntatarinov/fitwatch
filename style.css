@@ -357,3 +357,17 @@ h1 .ti { vertical-align:-3px; }
 button.ghost svg { display:block; }
 .ios-share { display:inline-flex; vertical-align:-3px; color:var(--info); }
 .install b { display:flex; align-items:center; gap:8px; }
+
+/* ================= Установка в приветствии, пример кабинета, вкладка тренера ================= */
+[hidden] { display:none !important; }
+.ob-app { position:relative; width:104px; height:104px; animation:orbpulse 3.2s ease-in-out infinite; }
+.ob-app img { display:block; width:104px; height:104px; border-radius:26px; box-shadow:0 18px 40px rgba(232,72,12,.35); }
+.ob-dl { position:absolute; right:-14px; bottom:-10px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--surface); color:var(--accent-text); box-shadow:0 8px 20px rgba(0,0,0,.2); animation:obfloat 2.6s ease-in-out infinite; }
+.ob-install { margin:14px auto 0; display:block; padding:13px 34px; font-size:16px; }
+.demo-banner { background:var(--info-soft); border-color:transparent; box-shadow:none; } .demo-banner p { margin:4px 0 10px; }
+.tabbar a { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:380px) { .tabbar a { font-size:10px; letter-spacing:-.01em; } }
+.login-btn { display:inline-flex; align-items:center; height:34px; padding:0 14px; border-radius:999px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:14px; white-space:nowrap; }
+.login-card { border-color:var(--accent); }
+.ob-login { display:block; margin:10px auto 0; background:none; color:var(--accent-text); font-weight:650; padding:6px 10px; }
+@media (max-width:400px) { .icon-btn.help { display:none; } .badge { max-width:34vw; } }
