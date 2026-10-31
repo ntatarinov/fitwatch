@@ -94,11 +94,11 @@ const submit = (w, form) => form.dispatchEvent(new w.Event("submit", { cancelabl
   ok(await until(() => /Вход через Telegram · Telegram @marat_fit/.test(text(a.w, "main"))) && !$(a.w, ".tg-btn"), "в аккаунте видно вход через Telegram, привязывать нечего");
 
   // ---- удаление аккаунта без пароля ----
-  a.w.prompt = () => "нет";
-  click(a.w, $(a.w, "#delacc")); await tick(80);
-  ok(a.w.Account.state.status === "user", "неверное слово подтверждения: аккаунт остался");
-  a.w.prompt = () => "удалить";
   click(a.w, $(a.w, "#delacc"));
+  ok(!$(a.w, "#delform").hidden && $(a.w, "#delpw").type === "text", "без пароля: поле для слова УДАЛИТЬ");
+  $(a.w, "#delpw").value = "нет"; a.w.document.getElementById("delform").dispatchEvent(new a.w.Event("submit", { cancelable: true, bubbles: true })); await tick(80);
+  ok(a.w.Account.state.status === "user" && /УДАЛИТЬ/.test(text(a.w, "#delerr")), "неверное слово подтверждения: аккаунт остался");
+  $(a.w, "#delpw").value = "удалить"; a.w.document.getElementById("delform").dispatchEvent(new a.w.Event("submit", { cancelable: true, bubbles: true }));
   ok(await until(() => a.w.Account.state.status === "anon"), "слово УДАЛИТЬ: аккаунт удалён");
   ok(Number((await db.query("SELECT count(*)::int AS n FROM users WHERE telegram_id = 9001"))[0].n) === 0, "данные удалены с сервера");
 

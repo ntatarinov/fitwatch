@@ -76,7 +76,7 @@ async function register(w, name, email, consent) {
   $(a.w, "#acform").elements.password.value = "password-123";
   submit(a.w, $(a.w, "#acform"));
   ok(await until(() => a.w.location.hash === "#/rating" && a.w.Account.state.status === "user"), "после регистрации: вход выполнен, открыт рейтинг");
-  ok(await until(() => /Вы пока не участвуете/.test(text(a.w, "main"))), "рейтинг: предложение участвовать");
+  ok(await until(() => /Ты пока не участвуешь/.test(text(a.w, "main"))), "рейтинг: предложение участвовать");
   click(a.w, $(a.w, "#joinrate"));
   ok(await until(() => /Алия \(вы\)/.test(text(a.w, "#lb"))), "после включения участия имя видно в рейтинге");
 
@@ -87,7 +87,7 @@ async function register(w, name, email, consent) {
   await tick(80);
   await go(a.w, "#/rating");
   ok(await until(() => /20/.test(text(a.w, ".lb-row.me .pt")) && /1 трен/.test(text(a.w, ".lb-row.me"))), "в рейтинге у игрока 20 очков и 1 тренировка");
-  ok(/Бонус за серию/.test(text(a.w, "main")) && /\+5 с третьей/.test(text(a.w, "main")), "правила бонусов объяснены на странице");
+  ok(/Бонус за серию/.test(text(a.w, "main")) && /\+5 к каждой тренировке начиная с третьей/.test(text(a.w, "main")) && /одного дня отдыха/.test(text(a.w, "main")), "правила бонусов и серии объяснены на странице так, как считает сервер");
 
   // ---- 4. вес ----
   await go(a.w, "#/body/weight");
@@ -147,8 +147,12 @@ async function register(w, name, email, consent) {
   ok(await until(() => a.w.Account.state.status === "user"), "вход с верным паролем");
   await go(a.w, "#/account");
   await until(() => !!$(a.w, "#delacc"));
-  a.w.prompt = () => "password-123";
+  let prompted = false; a.w.prompt = () => { prompted = true; return null; };
   click(a.w, $(a.w, "#delacc"));
+  ok(!$(a.w, "#delform").hidden && $(a.w, "#delpw").type === "password" && !prompted, "удаление: поле пароля на странице (скрыто точками), без системного окна");
+  $(a.w, "#delpw").value = "неверный"; submit(a.w, $(a.w, "#delform"));
+  ok(await until(() => /пароль/i.test(text(a.w, "#delerr"))) && a.w.Account.state.status === "user", "неверный пароль: аккаунт на месте, понятная ошибка");
+  $(a.w, "#delpw").value = "password-123"; submit(a.w, $(a.w, "#delform"));
   ok(await until(() => a.w.Account.state.status === "anon", 2500), "аккаунт удалён, вход снят");
   ok((await db.query("SELECT count(*)::int AS n FROM users WHERE email = 'aliya@test.kz'"))[0].n === 0 && (await db.query("SELECT count(*)::int AS n FROM measurements m LEFT JOIN users u ON u.id = m.user_id WHERE u.id IS NULL"))[0].n === 0, "данные удалены с сервера");
 

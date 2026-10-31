@@ -64,7 +64,7 @@ async function userFromCookie(db, cookies) {
 // Почта не годится: её никто не подтверждает, и чужую ещё не зарегистрированную почту мог бы занять кто угодно.
 const envList = name => String(process.env[name] || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
 const isAdmin = u => !!u && !!((u.telegramId && envList("ADMIN_TELEGRAM_IDS").includes(String(u.telegramId))) || (u.id && envList("ADMIN_USER_IDS").includes(String(u.id).toLowerCase())));
-const publicUser = u => ({ email: u.email || null, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u),
+const publicUser = u => ({ id: u.id, email: u.email || null, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u),
   telegram: u.telegramId ? { linked: true, username: u.telegramUsername } : { linked: false }, hasPassword: !!u.hasPassword });
 
 // Тариф человека: free, premium или personal; действует до даты until.

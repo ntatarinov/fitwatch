@@ -6,7 +6,7 @@
   --bg:#F4F3F0; --surface:#FFFFFF; --surface-2:#F0EEE9; --text:#14141A; --muted:#5C6270; --line:#E6E3DC;
   --accent:#D33C08; --accent-2:#FF6A2B; --accent-soft:#FFECE3; --accent-text:#A82E04; --on-accent:#FFFFFF;
   --ok:#0B7A4A; --ok-soft:#E2F5EB; --warn:#8F5405; --warn-soft:#FFF0D6; --info:#1F4FC4; --info-soft:#E7EEFF;
-  --ring-a:#FF6A2B; --ring-b:#FFB020; --mz:#E9E5DD; --mz-hover:#FFD9C7;
+  --ring-a:#FF6A2B; --ring-b:#FFB020; --mz:#D8D1C4; --mz-hover:#FFC9AE;
   --hero-a:#D23E08; --hero-b:#B33005; --shadow:0 1px 2px rgba(20,20,26,.05), 0 8px 24px rgba(20,20,26,.06);
   --radius:20px; --radius-sm:14px; color-scheme:light;
 }
@@ -15,14 +15,14 @@
     --bg:#0C0C0F; --surface:#17171C; --surface-2:#212128; --text:#F5F5F7; --muted:#A3A3AF; --line:#2B2B34;
     --accent:#FF6A2B; --accent-2:#FF6A2B; --accent-soft:rgba(255,106,43,.14); --accent-text:#FF8A55; --on-accent:#1A0B03;
     --ok:#34D399; --ok-soft:rgba(52,211,153,.14); --warn:#FBBF24; --warn-soft:rgba(251,191,36,.14); --info:#7AA2FF; --info-soft:rgba(122,162,255,.14);
-    --ring-a:#FF6A2B; --ring-b:#FFB020; --mz:#2C2C35; --mz-hover:#4A2C20; --shadow:0 0 0 1px rgba(255,255,255,.03); color-scheme:dark;
+    --ring-a:#FF6A2B; --ring-b:#FFB020; --mz:#3E3E4A; --mz-hover:#5A3322; --shadow:0 0 0 1px rgba(255,255,255,.03); color-scheme:dark;
   }
 }
 :root[data-theme="dark"] {
   --bg:#0C0C0F; --surface:#17171C; --surface-2:#212128; --text:#F5F5F7; --muted:#A3A3AF; --line:#2B2B34;
   --accent:#FF6A2B; --accent-2:#FF6A2B; --accent-soft:rgba(255,106,43,.14); --accent-text:#FF8A55; --on-accent:#1A0B03;
   --ok:#34D399; --ok-soft:rgba(52,211,153,.14); --warn:#FBBF24; --warn-soft:rgba(251,191,36,.14); --info:#7AA2FF; --info-soft:rgba(122,162,255,.14);
-  --ring-a:#FF6A2B; --ring-b:#FFB020; --mz:#2C2C35; --mz-hover:#4A2C20; --shadow:0 0 0 1px rgba(255,255,255,.03); color-scheme:dark;
+  --ring-a:#FF6A2B; --ring-b:#FFB020; --mz:#3E3E4A; --mz-hover:#5A3322; --shadow:0 0 0 1px rgba(255,255,255,.03); color-scheme:dark;
 }
 
 /* ================= База ================= */
@@ -373,3 +373,41 @@ button.ghost svg { display:block; }
 @media (max-width:400px) { .icon-btn.help { display:none; } .badge { max-width:34vw; } }
 
 .ask { margin:6px 0; padding:8px 12px; border-radius:12px; background:var(--surface-2); color:var(--muted); font-size:14px; font-style:italic; line-height:1.4; }
+
+/* ================= Исправления по аудиту: узкие экраны, касания, тёмная тема, доступность ================= */
+/* поля в строке с кнопкой сжимаются, а не выталкивают кнопку за край */
+input, select, textarea { min-width:0; }
+.cl-act { flex-wrap:wrap; }
+.card > .row { flex-wrap:wrap; }
+.greet h1 { overflow-wrap:anywhere; } .lvl small { white-space:nowrap; }
+/* касания не меньше 40 px */
+.mode-chip, .login-btn { height:40px; }
+.icon-btn { width:40px; height:40px; }
+.tiny-btn, .tip-x { min-height:40px; }
+a.pill, .chips .pill { display:inline-flex; align-items:center; min-height:36px; padding:4px 14px; }
+.back { padding:8px 0; }
+.ob-skip, .ob-login { min-height:40px; }
+/* шесть вкладок у тренера помещаются */
+.tabbar:has(#coachtab:not([hidden])) a { font-size:10px; padding-left:0; padding-right:0; }
+/* тёмная тема: дорожка кольца и галочка выполненного шага видны */
+.mini-ring .trk { stroke:color-mix(in srgb, var(--text) 12%, transparent); }
+.step-list li.done .st-ic { color:var(--surface); }
+/* фокус на цветной карточке-совете виден */
+.hero :focus-visible { outline-color:#fff; }
+/* вырез iPhone: контент не прячется за меню, уведомления не налезают на шапку */
+body { padding-bottom:calc(84px + env(safe-area-inset-bottom)); }
+.toasts { top:calc(68px + env(safe-area-inset-top)); }
+/* закрытые достижения читаются: бледнеет только значок */
+.bd.lock { opacity:1; filter:none; } .bd.lock .em { opacity:.45; filter:grayscale(1); } .bd.lock b { color:var(--muted); }
+/* схема тела: зоны заметнее */
+.mz { stroke:color-mix(in srgb, var(--text) 25%, transparent); }
+/* формы: подписи над полями, группы выбора */
+fieldset.grp { border:0; padding:0; margin:10px 0 0; min-width:0; } fieldset.grp legend { padding:0; margin-bottom:2px; }
+.fields3 { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-top:6px; }
+.fld { display:flex; flex-direction:column; gap:4px; margin:0; } .fld span { font-size:13px; color:var(--muted); font-weight:600; } .fld input { width:100%; }
+.chips.scale { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; } .chips.scale .chip span { min-width:0; padding:8px 4px; text-align:center; } .chips.scale small { font-size:10px; line-height:1.2; }
+.visually-hidden { position:absolute !important; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+.file-btn { display:inline-flex; align-items:center; gap:8px; cursor:pointer; margin:4px 0 8px; }
+.file-btn:focus-within, #photo:focus + .file-btn { outline:2px solid var(--accent); outline-offset:2px; }
+button.danger { background:#B42318; color:#fff; }
+code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radius:6px; overflow-wrap:anywhere; }

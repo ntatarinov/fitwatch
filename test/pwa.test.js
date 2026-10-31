@@ -55,13 +55,13 @@ test("страница подключает манифест, значки и н
 function loadSw() {
   const handlers = {}, store = new Map(), calls = { added: [], deleted: [], put: [], fetched: [] };
   const caches = {
-    open: async name => ({ add: async u => { calls.added.push(name + ":" + u); }, put: async (r, res) => { calls.put.push(r.url); } }),
+    open: async name => ({ addAll: async list => { list.forEach(u => calls.added.push(name + ":" + u)); }, put: async (r, res) => { calls.put.push(r.url); } }),
     keys: async () => ["old-cache", "fw-" + pkg.version],
     delete: async k => { calls.deleted.push(k); return true; },
-    match: async req => store.get(typeof req === "string" ? req : req.url) || null,
+    match: async (req, opts) => { const key = typeof req === "string" ? req : req.url; return store.get(key) || (opts && opts.ignoreSearch ? store.get(key.split("?")[0]) : null) || null; },
   };
   const self = { addEventListener: (t, f) => { handlers[t] = f; }, location: { origin: "https://fitwatch.test" }, skipWaiting: () => { calls.skipped = true; }, clients: { claim: async () => { calls.claimed = true; } } };
-  const ctx = vm.createContext({ self, caches, URL, Response: { error: () => "ERR" }, Promise, fetch: async req => { calls.fetched.push(req.url); return { ok: true, type: "basic", clone() { return this; } }; } });
+  const ctx = vm.createContext({ self, caches, URL, Response: { error: () => "ERR" }, Promise, setTimeout, fetch: async req => { calls.fetched.push(req.url); return { ok: true, type: "basic", clone() { return this; } }; } });
   vm.runInContext(read("sw.js"), ctx);
   return { handlers, calls, store, ctx };
 }
@@ -85,13 +85,13 @@ test("сервис-воркер: не трогает /api/, чужие адре�
   }
 });
 
-test("сервис-воркер: статику берёт из сети и кладёт копию; без сети отдаёт сохранённое, страницы — главную", async () => {
-  const { handlers, calls, store } = loadSw();
+test("сервис-воркер: статику берёт из сети и не подмешивает её в кэш; без сети отдаёт сохранённое, страницы — главную", async () => {
+  const { handlers, calls } = loadSw();
   const e = fetchEvent("https://fitwatch.test/style.css");
   handlers.fetch(e);
   assert.equal(e.responded, true);
   assert.equal((await e.p).ok, true);
-  assert.deepEqual(calls.put, ["https://fitwatch.test/style.css"]);
+  assert.deepEqual(calls.put, [], "в работе кэш не пополняется по одному файлу: только целой оболочкой при установке");
   // сеть пропала
   const off = loadSw();
   off.ctx.fetch = async () => { throw new Error("offline"); };
@@ -99,8 +99,22 @@ test("сервис-воркер: статику берёт из сети и кл
   off.store.set("/index.html", "CACHED-INDEX");
   const a = fetchEvent("https://fitwatch.test/app.js"); off.handlers.fetch(a);
   assert.equal(await a.p, "CACHED-APP");
-  const n = fetchEvent("https://fitwatch.test/", "GET", "navigate"); off.handlers.fetch(n);
+  const n = fetchEvent("https://fitwatch.test/?source=pwa", "GET", "navigate"); off.handlers.fetch(n);
   assert.equal(await n.p, "CACHED-INDEX");
+  const miss = fetchEvent("https://fitwatch.test/nope.js"); off.handlers.fetch(miss);
+  assert.equal(await miss.p, "ERR");
+});
+
+test("сервис-воркер: зависшая сеть не держит приложение дольше 4 секунд, если есть сохранённая копия", async () => {
+  const slow = loadSw();
+  slow.ctx.fetch = () => new Promise(() => {}); // сеть не отвечает никогда
+  slow.store.set("https://fitwatch.test/app.js", "CACHED-APP");
+  const src = require("fs").readFileSync(require("path").join(__dirname, "..", "sw.js"), "utf8");
+  assert.match(src, /TIMEOUT_MS = 4000/);
+  // ускоряем ожидание для теста: подменяем setTimeout на мгновенный
+  slow.ctx.setTimeout = (fn, ms, arg) => setTimeout(fn, 1, arg);
+  const ev = fetchEvent("https://fitwatch.test/app.js"); slow.handlers.fetch(ev);
+  assert.equal(await ev.p, "CACHED-APP");
 });
 
 test("сервис-воркер: при установке кладёт оболочку, при запуске удаляет старые кэши", async () => {

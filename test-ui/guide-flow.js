@@ -30,7 +30,7 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
 
 (async () => {
   // 1. Первый заход: приветствие
-  const { w, errors } = load(null);
+  const { w, errors } = load(null, { anon: true });
   await tick(60);
   const ob = () => $(w, "#onboard");
   ok(!!ob() && ob().getAttribute("role") === "dialog" && ob().getAttribute("aria-modal") === "true", "приветствие открылось как диалог");
@@ -199,25 +199,25 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   ok(prompted, "кнопка «Установить» показала системное окно браузера");
 
   // 11. Приветствие при каждом заходе, пока не вошёл
-  const second = load({ mode: "pro", onboarded: true, modules: ["food", "sleep"] });
+  const second = load({ mode: "pro", onboarded: true, modules: ["food", "sleep"] }, { anon: true });
   await tick(60);
   ok(!!$(second.w, "#onboard"), "повторный заход без входа: приветствие снова показано");
   ok($(second.w, "[data-skip]") !== null && second.w.document.body.dataset.mode === "pro", "под окном режим Pro на месте");
   click(second.w, $(second.w, "[data-skip]"));
   ok(!$(second.w, "#onboard") && ui(second.w).mode === "pro" && JSON.stringify(ui(second.w).modules) === JSON.stringify(["food", "sleep"]), "«Пропустить» при повторном показе настройки не меняет (Pro и разделы остались)");
-  const again = load({ mode: "pro", onboarded: true, modules: ["food", "sleep"] });
+  const again = load({ mode: "pro", onboarded: true, modules: ["food", "sleep"] }, { anon: true });
   await tick(60);
   click(again.w, $(again.w, "[data-next]")); click(again.w, $(again.w, "[data-next]")); click(again.w, $(again.w, "[data-next]"));
   ok($(again.w, '[data-interest="food"]').getAttribute("aria-checked") === "true" && $(again.w, '[data-interest="sleep"]').getAttribute("aria-checked") === "true" && $(again.w, '[data-interest="rating"]').getAttribute("aria-checked") === "false", "в повторном приветствии отмечены текущие разделы");
   key(again.w, "Escape");
   ok(!$(again.w, "#onboard") && ui(again.w).mode === "pro", "Esc при повторном показе тоже ничего не меняет");
-  const off = load({ mode: "pro", onboarded: true, welcomeOff: true });
+  const off = load({ mode: "pro", onboarded: true, welcomeOff: true }, { anon: true });
   await tick(60);
   ok(!$(off.w, "#onboard") && off.w.document.body.dataset.mode === "pro" && off.w.document.body.dataset.hide === "", "если приветствие отключено в настройках, окна нет; Pro без выбора показывает всё");
   const logged = load(null, { loggedIn: true });
   await tick(60);
   ok(!$(logged.w, "#onboard"), "после входа в аккаунт приветствие не показывается, даже если его ещё не видели");
-  const third = load(null);
+  const third = load(null, { anon: true });
   await tick(60);
   click(third.w, $(third.w, "[data-skip]"));
   ok(!$(third.w, "#onboard") && ui(third.w).onboarded === true && ui(third.w).mode === "lite", "«Пропустить» при первом заходе оставляет Lite");
@@ -232,6 +232,14 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   ok(ui(w).welcomeOff === true && $(w, "[data-welcome-toggle]").getAttribute("aria-checked") === "false", "приветствие отключено в настройках и это записано");
   click(w, $(w, "[data-welcome-toggle]")); await tick(20);
   ok(ui(w).welcomeOff === false, "и включено обратно");
+
+  // 11b. Сервер недоступен: приветствие и «Войти» не показываются (войти всё равно нельзя)
+  const offline = load(null);
+  await tick(80);
+  ok(!$(offline.w, "#onboard") && offline.w.Account.state.status === "offline", "без сервера приветствие не открывается");
+  ok($(offline.w, "#loginbtn").hidden === true, "без сервера кнопки «Войти» в шапке нет");
+  await go(offline.w, "#/");
+  ok(!/Сохрани прогресс/.test(text(offline.w, "#stepscard")), "без сервера шаг «Сохрани прогресс» не предлагается");
 
   // 12. Вход на виду
   const guest = load({ mode: "lite", onboarded: true, welcomeOff: true }, { anon: true });
@@ -320,7 +328,7 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   await tick(20);
   ok(!!$(w5.w, "main #installcard [data-install]") && $$(w5.w, "main > *").indexOf($(w5.w, "main #installcard")) <= 2, "на главной карточка «Установить» стоит в самом верху");
 
-  const all = errors.concat(second.errors, again.errors, off.errors, logged.errors, third.errors, old.errors, guest.errors, guestPro.errors, user.errors, coach.errors, w1.errors, w2.errors, w3.errors, w4.errors, w5.errors);
+  const all = errors.concat(offline.errors, second.errors, again.errors, off.errors, logged.errors, third.errors, old.errors, guest.errors, guestPro.errors, user.errors, coach.errors, w1.errors, w2.errors, w3.errors, w4.errors, w5.errors);
   ok(all.length === 0, "ошибок в консоли нет " + all.join("; "));
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);

@@ -12,8 +12,9 @@
   P._coachDemo = () => ({ world: demoWorld, client: demoClient }); // для проверок
 
   async function gate(FW, title) {
-    const acc = A();
+    const acc = A(), nav = FW.nav();
     if (acc.state.status === "unknown") { FW.app.innerHTML = '<div class="card"><p class="muted">Загружаю…</p></div>'; await acc.refresh(); }
+    if (FW.stale(nav)) return false; // пока ждали сервер, человек ушёл на другую страницу
     const s = acc.state;
     if (s.status === "user") return true;
     FW.app.innerHTML = `<h1>${FW.esc(title)}</h1>` + (s.status === "offline"
@@ -84,10 +85,11 @@
 
   // ---------- все клиенты ----------
   P.coach = async function (FW, arg) {
-    const demo = arg === "demo";
-    if (!demo && !(await gate(FW, "Клиенты"))) return;
+    const demo = arg === "demo", nav = FW.nav();
+    if (!demo && (!(await gate(FW, "Клиенты")) || FW.stale(nav))) return;
     const { app, esc } = FW, acc = A();
     const r = demo ? { ok: true, data: demoWorld().overview } : await acc.coachOverview();
+    if (FW.stale(nav)) return;
     if (!r.ok) {
       app.innerHTML = `<a class="back" href="#/trainers">← Тренеры</a><h1>Клиенты</h1><div class="card"><p class="muted">${r.status === 403 ? "Кабинет доступен подтверждённым тренерам. Подать заявку можно в разделе «Тренеры»." : esc(errText(r))}</p>${r.status === 403 ? '<a class="btn" href="#/trainers">К тренерам</a>' : ""}</div>`;
       return;
@@ -137,10 +139,11 @@
 
   // ---------- один клиент ----------
   P.clientView = async function (FW, id) {
-    const demo = isDemo(id), home = demo ? "#/coach/demo" : "#/coach";
-    if (!demo && !(await gate(FW, "Клиент"))) return;
+    const demo = isDemo(id), home = demo ? "#/coach/demo" : "#/coach", nav = FW.nav();
+    if (!demo && (!(await gate(FW, "Клиент")) || FW.stale(nav))) return;
     const { app, esc } = FW, acc = A();
     const r = demo ? (demoClient(id) ? { ok: true, data: demoClient(id) } : { ok: false, error: "Не найдено" }) : await acc.coachClient(id);
+    if (FW.stale(nav)) return;
     if (!r.ok) { app.innerHTML = `<a class="back" href="${home}">← Клиенты</a><h1>Клиент</h1><div class="card"><p class="muted">${esc(errText(r))}</p></div>`; return; }
     const b = r.data, c = b.client, s = b.stats, ser = b.series, g = b.goals, C = window.Catalog, PL = window.Planner;
     const active = c.status === "active";
@@ -163,7 +166,7 @@
       ${active && s ? `<h2>Последние тренировки</h2><div class="card">${ser.recent.length ? ser.recent.map(w => `<div class="row wl"><span>${esc(ddmm(w.day))} · ${esc(w.title || w.program)}</span><span class="pill">+${w.points}</span></div>`).join("") : '<p class="muted">Пока нет.</p>'}</div>` : ""}
       <h2>Моя заметка</h2>
       <div class="card"><p class="muted tiny" style="margin-top:0">Видите только вы, клиент заметку не получает.</p>
-        <textarea id="tnote" rows="4" maxlength="1000" placeholder="Что важно помнить: ограничения, договорённости, план на ближайшие недели">${esc(b.trainerNote)}</textarea>
+        <textarea id="tnote" aria-label="Заметка о клиенте" rows="4" maxlength="1000" placeholder="Что важно помнить: ограничения, договорённости, план на ближайшие недели">${esc(b.trainerNote)}</textarea>
         <div class="row"><span class="status" id="nstat" role="status"></span><button type="button" id="nsave">Сохранить</button></div></div>
       <div class="cl-act wrap">${demo ? '<button type="button" disabled>Открыть чат</button>' : `<a class="btn" href="#/chat/${c.linkId}">Открыть чат</a>`}${active ? `<button type="button" class="ghost" id="cend" ${demo ? "disabled" : ""}>Завершить работу с клиентом</button>` : ""}</div>
       <p class="muted tiny">${DISCLAIMER}</p>`;

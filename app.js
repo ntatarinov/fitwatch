@@ -12,12 +12,27 @@
   // ---------- состояние профиля (localStorage) ----------
   // seen — открытые достижения, о которых уже сказали; lvl — последний показанный уровень (null/0 — ещё не отмечено)
   // me — анкета (цель, уровень, дни, ограничения, параметры); plan — подобранный план {builtAt, params, days, warnings};
-  // done/watched — просмотр видео; log — отметки «Я потренировался» [{date,p,d,points,t}];
+  // done/watched — просмотр видео; log — отметки «Тренировка сделана» [{date,p,d,points,t}];
   // checkins — ежедневный отзыв [{date,energy,mood,barrier,liked,disliked,idea}];
   // food — дневник питания [{date,name,kcal, p,f,c,grams,nid}] (БЖУ может не быть)
   const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null, seen: null, lvl: 0, sleep: [] });
+  // Сохранённое состояние проверяется по типам: поле не того вида (после старой версии или ручной правки) заменяется пустым,
+  // иначе одна ошибка ломала бы главную и профиль, где лежит кнопка сброса.
+  function normalize(raw) {
+    const s = fresh(), o = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    const isObj = v => !!v && typeof v === "object" && !Array.isArray(v);
+    ["log", "checkins", "food", "sleep"].forEach(key => { if (Array.isArray(o[key])) s[key] = o[key].filter(isObj); });
+    ["done", "watched"].forEach(key => { if (isObj(o[key])) s[key] = o[key]; });
+    if (typeof o.name === "string" && o.name.trim()) s.name = o.name.slice(0, 30);
+    if (Number.isFinite(o.kcalGoal) && o.kcalGoal >= 800 && o.kcalGoal <= 6000) s.kcalGoal = o.kcalGoal;
+    if (isObj(o.me)) s.me = Object.assign({ limits: [] }, o.me, { limits: Array.isArray(o.me.limits) ? o.me.limits : [] });
+    if (isObj(o.plan) && Array.isArray(o.plan.days)) s.plan = o.plan;
+    if (Array.isArray(o.seen)) s.seen = o.seen;
+    if (Number.isFinite(o.lvl)) s.lvl = o.lvl;
+    return s;
+  }
   function load() {
-    try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY))); }
+    try { return normalize(JSON.parse(localStorage.getItem(KEY))); }
     catch (e) { return fresh(); }
   }
   const hadStored = (() => { try { return localStorage.getItem(KEY) !== null; } catch (e) { return false; } })();
@@ -95,6 +110,7 @@
     badge.firstChild.innerHTML = window.Icons.svg("star", 16);
     const a = window.Account.state;
     badge.lastChild.textContent = a.status === "user" ? totalPoints() + " · " + displayName() : String(totalPoints());
+    badge.setAttribute("aria-label", "Баллы: " + totalPoints() + (a.status === "user" ? ", " + displayName() : "") + ". Открыть профиль");
   }
 
   function profileNow() {
@@ -160,14 +176,29 @@
 
   function logWorkout(p, d) {
     if (trainedToday()) return false;
-    state.log.push({ date: today(), p: p.id, d: d.id, points: dayPoints(d), t: d.title });
+    const entry = { date: today(), p: p.id, d: d.id, points: dayPoints(d), t: d.title };
+    state.log.push(entry);
     save();
-    // Если человек вошёл в аккаунт, тренировка записывается и на сервер: оттуда очки и бонусы для рейтинга.
-    window.Account.recordWorkout({ day: today(), program: p.id, dayId: d.id, title: d.title }).then(r => {
-      if (r.ok && r.data.bonus) window.FX.toast("Бонус за серию: +" + r.data.bonus + " очков", "flame");
-      if (r.ok) window.Account.refresh();
-    });
+    // Если человек вошёл в аккаунт, тренировка записывается и на сервер: оттуда баллы и бонусы для рейтинга.
+    // Не дошла (нет сети) — помечается и отправляется позже, когда сервер снова ответит.
+    if (window.Account.state.status === "user" || window.Account.state.status === "offline") {
+      entry.pending = true; save();
+      sendWorkout(entry);
+    }
     return true;
+  }
+  async function sendWorkout(entry) {
+    const r = await window.Account.recordWorkout({ day: entry.date, program: entry.p, dayId: entry.d, title: entry.t });
+    if (r.ok || r.status === 409 || r.status === 400) delete entry.pending; // записана, уже была или вне окна дат: ждать нечего
+    if (r.ok && r.data.bonus) window.FX.toast("Бонус за серию: +" + r.data.bonus + " баллов", "flame");
+    save();
+    if (r.ok) window.Account.refresh();
+  }
+  let flushing = false;
+  async function flushPending() {
+    if (flushing || window.Account.state.status !== "user") return;
+    flushing = true;
+    try { for (const e of state.log.filter(x => x.pending)) await sendWorkout(e); } finally { flushing = false; }
   }
 
   // Демо-данные: две недели жизни «спринтера», чтобы сразу показать профиль заказчику.
@@ -331,7 +362,7 @@
   }
   // Данные для чек-листа «Первые шаги»: считаются из прогресса и входа в аккаунт.
   function stepsCtx() {
-    return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref(), useFood: window.Guide.show("food") };
+    return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref(), useFood: window.Guide.show("food"), canLogin: window.Account.state.status !== "offline" };
   }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
@@ -422,7 +453,7 @@
       return `<a class="card" href="#/e/${p.id}/${e.id}"><div class="row"><div><b>${esc(e.title)}</b><div class="muted">${esc(e.summary)}</div></div>
         <span class="pill ${done ? "done" : ""}">${done ? ic("check", 14) + " просмотрено" : "видео +" + e.points}</span></div></a>`;
     }).join("");
-    app.innerHTML = `<a class="back" href="#/">← Все программы</a><h1>${esc(p.title)}</h1><p class="muted">${esc(p.description)}</p>
+    app.innerHTML = `<a class="back" href="#/programs">← Все программы</a><h1>${esc(p.title)}</h1><p class="muted">${esc(p.description)}</p>
       <h2>План</h2>${days}<h2>Видео и разбор техники</h2>${exs}`;
   }
 
@@ -438,7 +469,7 @@
         <a class="pill ${watched ? "done" : ""}" href="#/e/${p.id}/${e.id}">${watched ? ic("check", 14) + " видео" : ic("play", 14) + " видео"}</a></div></div>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/p/${p.id}">← ${esc(p.title)}</a><h1>${esc(d.title)}</h1>
-      <p class="muted">Разомнитесь 3–5 минут, затем выполните план. Если не знаете технику — сначала откройте видео.</p>
+      <p class="muted">Разомнись 3–5 минут, затем выполни план. Если не знаешь технику, сначала открой видео.</p>
       ${items}
       <div id="checkin"></div>`;
     renderCheckin(p, d, justDone);
@@ -457,8 +488,8 @@
       box.innerHTML = `<div class="status ok">${ic("check", 18)} Сегодняшняя тренировка уже засчитана. Следующая — завтра или через день: отдых тоже часть программы.</div>`;
       return;
     }
-    box.innerHTML = `<button id="done" class="wide">Я потренировался (+${pts})</button>
-      <p class="muted">Отмечайте честно: за один календарный день засчитывается одна тренировка.</p>`;
+    box.innerHTML = `<button id="done" class="wide">Тренировка сделана (+${pts})</button>
+      <p class="muted">Отмечай честно: за один календарный день засчитывается одна тренировка.</p>`;
     document.getElementById("done").onclick = () => { if (logWorkout(p, d)) { window.FX.celebrate(); (rerender || (() => day(p.id, d.id, true)))(); } };
   }
 
@@ -521,7 +552,7 @@
 
   // --- ежедневный отзыв ---
   function scale(name, labels, val) {
-    return `<div class="chips">` + labels.map((l, i) =>
+    return `<div class="chips scale">` + labels.map((l, i) =>
       `<label class="chip"><input type="radio" name="${name}" value="${i + 1}" ${i + 1 === val ? "checked" : ""}><span>${i + 1}<small>${esc(l)}</small></span></label>`).join("") + `</div>`;
   }
   function checkin(saved) {
@@ -529,13 +560,13 @@
     app.innerHTML = `<h1>Отзыв за сегодня</h1><p class="muted">Минута. От ответов зависят советы и профиль. Всё хранится только на этом устройстве.</p>
       ${saved ? adviceHtml() : ""}
       <form id="ci" class="card">
-        <label><b>Сколько сил сегодня?</b></label>${scale("energy", ["нет сил", "мало", "норма", "хорошо", "полон сил"], c.energy)}
-        <label><b>Настроение?</b></label>${scale("mood", ["плохо", "так себе", "норм", "хорошо", "отлично"], c.mood)}
-        <label><b>Что мешает заниматься?</b></label>
-        <div class="chips">${window.BARRIERS.map(b => `<label class="chip"><input type="radio" name="barrier" value="${b.id}" ${b.id === c.barrier ? "checked" : ""}><span>${esc(b.label)}</span></label>`).join("")}</div>
-        <label><b>Что понравилось в приложении?</b></label><textarea name="liked" rows="2" maxlength="500">${esc(c.liked)}</textarea>
-        <label><b>Что не понравилось и почему?</b></label><textarea name="disliked" rows="2" maxlength="500">${esc(c.disliked)}</textarea>
-        <label><b>Что было бы круто?</b></label><textarea name="idea" rows="2" maxlength="500">${esc(c.idea)}</textarea>
+        <fieldset class="grp"><legend><b>Сколько сил сегодня?</b></legend>${scale("energy", ["нет сил", "мало", "норма", "хорошо", "полон сил"], c.energy)}</fieldset>
+        <fieldset class="grp"><legend><b>Настроение?</b></legend>${scale("mood", ["плохо", "так себе", "норм", "хорошо", "отлично"], c.mood)}</fieldset>
+        <fieldset class="grp"><legend><b>Что мешает заниматься?</b></legend>
+        <div class="chips">${window.BARRIERS.map(b => `<label class="chip"><input type="radio" name="barrier" value="${b.id}" ${b.id === c.barrier ? "checked" : ""}><span>${esc(b.label)}</span></label>`).join("")}</div></fieldset>
+        <label for="ciliked"><b>Что понравилось в приложении?</b></label><textarea id="ciliked" name="liked" rows="2" maxlength="500">${esc(c.liked)}</textarea>
+        <label for="cidisliked"><b>Что не понравилось и почему?</b></label><textarea id="cidisliked" name="disliked" rows="2" maxlength="500">${esc(c.disliked)}</textarea>
+        <label for="ciidea"><b>Что было бы круто?</b></label><textarea id="ciidea" name="idea" rows="2" maxlength="500">${esc(c.idea)}</textarea>
         <button class="wide" type="submit">${todayCheckin() ? "Обновить отзыв" : "Сохранить отзыв"}</button>
       </form>`;
     document.getElementById("ci").onsubmit = ev => {
@@ -563,7 +594,8 @@
     const installCard = window.Pwa ? window.Pwa.card() : "";
     const acct = window.Account.state, isTrainer = acct.status === "user" && acct.user && acct.user.isTrainer;
     const trainerRow = isTrainer ? linkRow("#/coach", "users", "Кабинет тренера", "Клиенты, дашборды и заметки", "Открыть")
-      : linkRow("#/trainers", "users", "Я тренер", "Подать заявку или посмотреть пример кабинета", "");
+      : acct.status === "user" ? linkRow("#/trainers", "users", "Я тренер", "Подать заявку или посмотреть пример кабинета", "")
+      : linkRow("#/coach/demo", "users", "Я тренер", "Пример кабинета тренера. Подать заявку можно после входа", "");
     app.innerHTML = `<h1>Профиль</h1>
       ${PAGES.accountCard(FW)}
       ${trainerRow}
@@ -614,11 +646,19 @@
     window.onYouTubeIframeAPIReady = () => { ytCallbacks.forEach(f => f()); ytCallbacks = []; };
     const s = document.createElement("script");
     s.src = "https://www.youtube.com/iframe_api";
+    // Не загрузилось (нет сети, блокировщик): следующая попытка возможна, а на странице честное сообщение вместо пустого места.
+    s.onerror = () => {
+      ytLoading = false; ytCallbacks = []; s.remove();
+      document.querySelectorAll(".video").forEach(v => { v.innerHTML = '<p class="muted" style="padding:16px;margin:0;color:#fff">Видео сейчас недоступно: проверь интернет и открой упражнение ещё раз.</p>'; });
+    };
     document.head.appendChild(s);
   }
 
   // ---------- роутер ----------
+  // Номер перехода: страница, которая ждёт ответа сервера, после ожидания сверяет его и не рисует себя поверх новой страницы.
+  let navId = 0;
   function route(keepScroll) {
+    navId++;
     if (PAGES._cleanup) PAGES._cleanup(); // остановить опрос чата и подобное
     app.classList.remove("enter"); void app.offsetWidth; app.classList.add("enter");
     stopPlayer();
@@ -667,8 +707,11 @@
   // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
   const PAGES = window.PAGES;
   PAGES.stepsCtx = stepsCtx;
-  const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
+  const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; },
+    nav: () => navId, stale: id => id !== navId };
   window.addEventListener("hashchange", route);
+  // Приложение открыто в двух вкладках (или установленное приложение и браузер): берём свежие данные, чтобы не затереть чужие записи.
+  window.addEventListener("storage", e => { if (e.key === KEY) { state = load(); renderBadge(); route(true); } });
   // Изменился вход/выход: обновляем страницы, где виден аккаунт. Без сервера приложение работает как раньше.
   // Вкладка «Клиенты» видна только подтверждённым тренерам.
   const coachTab = document.getElementById("coachtab");
@@ -676,10 +719,14 @@
   const syncAccount = () => {
     const s = window.Account.state;
     coachTab.hidden = !(s.status === "user" && s.user && s.user.isTrainer);
-    loginBtn.hidden = s.status === "user" || s.status === "unknown"; // «Войти» всегда на виду, пока не вошёл
+    loginBtn.hidden = s.status !== "anon"; // «Войти» на виду у гостя; без сервера (offline) войти всё равно нельзя
     renderBadge();
   };
-  window.Account.onChange(() => { syncAccount(); const a = location.hash.split("/")[1] || ""; if (["", "profile", "account", "rating", "body", "coach", "client"].includes(a)) route(true); });
+  window.Account.onChange(() => {
+    syncAccount(); tryWelcome(); flushPending();
+    const a = location.hash.split("/")[1] || "";
+    if (["", "profile", "account", "rating", "body", "coach", "client"].includes(a)) route(true);
+  });
   syncAccount();
   window.Account.refresh();
   renderBadge();
@@ -692,9 +739,16 @@
   window.Guide.apply();
   if (window.Pwa) { window.Pwa.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "guide"].includes(a)) route(); }); window.Pwa.init(); }
   route();
-  // Приветствие при каждом заходе, пока человек не вошёл. Статус входа известен после ответа сервера; если сервер молчит, ждём недолго.
-  const wait = ms => new Promise(r => setTimeout(r, ms));
-  Promise.race([window.Account.refresh(), wait(2500)]).catch(() => {}).then(() => {
-    if (window.Guide.shouldWelcome(window.Account.state.status === "user")) window.Guide.showOnboarding(document, { onDone: () => route(true) });
-  });
+  // Приветствие при каждом заходе, пока человек не вошёл. Показывается, только когда сервер точно ответил «гость»:
+  // не вошедшему без сети и вошедшему с медленной сетью оно не мешает; если человек вошёл, пока окно открыто, оно закрывается.
+  let welcomeTried = false, welcome = null;
+  function tryWelcome() {
+    const st = window.Account.state.status;
+    if (st === "user" && welcome) { welcome.finish(); welcome = null; return; }
+    if (welcomeTried || st !== "anon") return;
+    welcomeTried = true;
+    if (window.Guide.shouldWelcome(false)) welcome = window.Guide.showOnboarding(document, { onDone: () => { welcome = null; route(true); } });
+  }
+  tryWelcome();
+  flushPending();
 })();

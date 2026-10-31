@@ -105,6 +105,13 @@
     if (doc.documentElement) {
       if (p.theme === "auto") delete doc.documentElement.dataset.theme; else doc.documentElement.dataset.theme = p.theme;
     }
+    // Цвет строки браузера и системной панели: при теме «как в системе» — по системе, при выбранной вручную — по ней.
+    doc.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+      if (!m.dataset.media) m.dataset.media = m.getAttribute("media") || "";
+      const dark = /dark/.test(m.dataset.media);
+      if (p.theme === "auto") m.setAttribute("media", m.dataset.media);
+      else m.setAttribute("media", (p.theme === "dark") === dark ? "all" : "not all");
+    });
     doc.querySelectorAll("[data-modebtn]").forEach(b => { b.textContent = p.mode === "pro" ? "Pro" : "Lite"; b.setAttribute("aria-label", "Режим " + (p.mode === "pro" ? "Pro" : "Lite") + ". Нажми, чтобы переключить"); });
   }
 
@@ -124,10 +131,10 @@
     const c = ctx || {};
     const list = [
       { id: "plan", icon: "target", title: "Подбери план", hint: "Ответь на пару вопросов, и получишь тренировки под себя", href: "#/me", done: !!c.hasPlan },
-      { id: "workout", icon: "dumbbell", title: "Сделай первую тренировку", hint: "Открой день плана и нажми «Я потренировался»", href: c.nextHref || "#/programs", done: (c.workouts || 0) > 0 },
-      { id: "food", icon: "food", title: "Запиши, что съел", hint: "Выбери продукт и граммы: калории и БЖУ посчитаются сами", href: "#/food", done: (c.foodEntries || 0) > 0 },
-      { id: "account", icon: "cloud", title: "Сохрани прогресс", hint: "Войди через Telegram или почту: данные не потеряются", href: "#/account", done: !!c.loggedIn },
-    ].filter(s => s.id !== "food" || c.useFood !== false);
+      { id: "workout", icon: "dumbbell", title: "Сделай первую тренировку", hint: "Открой день плана и нажми «Тренировка сделана»", href: c.nextHref || "#/programs", done: (c.workouts || 0) > 0 },
+      { id: "food", icon: "food", title: "Запиши еду", hint: "Выбери продукт и граммы: калории и БЖУ посчитаются сами", href: "#/food", done: (c.foodEntries || 0) > 0 },
+      { id: "account", icon: "cloud", title: "Сохрани прогресс", hint: "Войди через Telegram или почту: тренировки, вес и баллы сохранятся на сервере", href: "#/account", done: !!c.loggedIn },
+    ].filter(s => (s.id !== "food" || c.useFood !== false) && (s.id !== "account" || c.canLogin !== false));
     const done = list.filter(s => s.done).length;
     const current = list.find(s => !s.done) || null;
     return { list, done, total: list.length, pct: Math.round(done / list.length * 100), current, complete: done === list.length };
@@ -136,7 +143,7 @@
   // ---------- подсказки на страницах ----------
   const TIPS = {
     me: ["target", "Ответь честно про ограничения: программа уберёт упражнения, которые тебе не подходят."],
-    plan: ["calendar", "Открой день плана и нажми «Я потренировался»: за каждый день баллы, а серия растёт."],
+    plan: ["calendar", "Открой день плана и нажми «Тренировка сделана»: за каждый день баллы, а серия растёт."],
     library: ["dumbbell", "Нажми на мышцу на схеме тела, и останутся упражнения именно для неё."],
     food: ["food", "Выбери продукт и граммы: калории и БЖУ посчитаются сами. Массу в записи можно поправить."],
     sleep: ["moon", "Записывай сон по утрам. Если спал меньше 6 часов, совет дня предложит лёгкий день."],
@@ -201,6 +208,9 @@
     el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "ob-title");
     doc.body.appendChild(el);
     doc.body.classList.add("ob-lock");
+    // Всё под окном недоступно для фокуса и экранного диктора, пока окно открыто.
+    const behind = Array.from(doc.body.children).filter(n => n !== el && !n.inert);
+    behind.forEach(n => { n.inert = true; n.setAttribute("aria-hidden", "true"); });
     const again = read().onboarded; // повторное приветствие: стоят текущие настройки, а «Пропустить» и Esc их не меняют
     const picked = new Set(again ? modules() : ["food"]); // впервые: питание отмечено заранее
     let i = 0, done = false, x0 = null, curId = "hello";
@@ -213,6 +223,7 @@
       done = true;
       finishOnboarding(m, mods);
       doc.removeEventListener("keydown", onKey);
+      behind.forEach(n => { n.inert = false; n.removeAttribute("aria-hidden"); });
       if (el.parentNode) el.parentNode.removeChild(el);
       doc.body.classList.remove("ob-lock");
       try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (e) { /* элемента уже нет */ }
@@ -223,7 +234,7 @@
       ${MODULES.map(m => `<button type="button" class="ob-opt ${picked.has(m.id) ? "on" : ""}" data-interest="${m.id}" role="checkbox" aria-checked="${picked.has(m.id)}"><span class="oi">${icon(m.icon)}</span><span class="ot"><b>${m.title}</b><small>${m.hint}</small></span><span class="ck">${icon("check")}</span></button>`).join("")}</div>`;
     const modeHtml = () => `<div class="ob-modes">
       <button type="button" class="ob-mode" data-pick="lite"><span class="oi">${icon("leaf")}</span><span class="ot"><b>Lite</b><small>Только нужное. Подсказки на страницах и первые шаги</small></span></button>
-      <button type="button" class="ob-mode" data-pick="pro"><span class="oi">${icon("bolt")}</span><span class="ot"><b>Pro</b><small>Без подсказок, больше данных: аналитика, идеи команды, выгрузка</small></span></button></div>`;
+      <button type="button" class="ob-mode" data-pick="pro"><span class="oi">${icon("bolt")}</span><span class="ot"><b>Pro</b><small>Без подсказок, больше данных: аналитика, выгрузка, идеи команды. Это не платный тариф</small></span></button></div>`;
     function draw() {
       const L = list();
       const at = L.findIndex(x => x.id === curId);
@@ -233,7 +244,7 @@
       const body = s.id === "interests" ? interestsHtml() : s.id === "mode" ? modeHtml() : `<div class="ob-art">${s.art}</div>`;
       const installBtn = s.id === "install" && s.status === "prompt" ? `<button type="button" class="ob-install" data-install-now>Установить</button>` : "";
       el.innerHTML = `<div class="ob-card" key="${s.id}">
-        <button type="button" class="ob-skip" data-skip>${last() ? "" : "Пропустить"}</button>
+        ${last() ? "" : `<button type="button" class="ob-skip" data-skip>Пропустить</button>`}
         ${body}
         <h2 id="ob-title">${s.title}</h2><p>${s.text}</p>${installBtn}
         <div class="ob-dots" aria-hidden="true">${L.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
@@ -279,7 +290,8 @@
         const f = Array.from(el.querySelectorAll("button")).filter(b => b.textContent.trim() || b.dataset.pick || b.dataset.interest);
         if (!f.length) return;
         const a = doc.activeElement, firstB = f[0], lastB = f[f.length - 1];
-        if (ev.shiftKey && a === firstB) { ev.preventDefault(); lastB.focus(); }
+        if (!el.contains(a)) { ev.preventDefault(); firstB.focus(); }
+        else if (ev.shiftKey && a === firstB) { ev.preventDefault(); lastB.focus(); }
         else if (!ev.shiftKey && a === lastB) { ev.preventDefault(); firstB.focus(); }
       }
     }

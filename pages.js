@@ -15,21 +15,21 @@
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Моя цель</h1>${window.Guide.tip("me")}
       <p class="muted">Ответь на несколько вопросов, и я подберу план тренировок. Всё хранится только на этом устройстве. Это общая подборка, а не медицинская или тренерская рекомендация.</p>
       <form id="meform" class="card">
-        <label><b>Как тебя зовут?</b></label><input name="name" maxlength="30" value="${esc(st.name === "Гость" ? "" : st.name)}" placeholder="Имя" style="width:100%">
-        <label><b>Какая цель?</b></label><div class="chips">${PL.GOALS.map(g => chip("goal", g.id, g.label, (me.goal || "health") === g.id)).join("")}</div>
-        <label><b>Какой у тебя уровень?</b></label><div class="chips">${C.LEVELS.map(l => chip("level", l.id, l.label, (me.level || 1) === l.id)).join("")}</div>
-        <label><b>Сколько дней в неделю?</b></label>${nums("days", [2, 3, 4, 5, 6], me.days || 3)}
-        <label><b>Сколько минут на тренировку?</b></label>${nums("minutes", PL.MINUTES, me.minutes || 30, " мин")}
-        <label><b>Где занимаешься?</b></label><div class="chips">${PL.PLACES.map(p => chip("place", p.id, p.label, (me.place || "home") === p.id)).join("")}</div>
-        <label><b>Что беспокоит? (необязательно)</b></label>
-        <div class="chips">${C.LIMITS.map(l => chip("limits", l.id, l.label, (me.limits || []).includes(l.id), "checkbox")).join("")}</div>
+        <label for="mename"><b>Как тебя зовут?</b></label><input id="mename" name="name" maxlength="30" value="${esc(st.name === "Гость" ? "" : st.name)}" placeholder="Имя" style="width:100%">
+        <fieldset class="grp"><legend><b>Какая цель?</b></legend><div class="chips">${PL.GOALS.map(g => chip("goal", g.id, g.label, (me.goal || "health") === g.id)).join("")}</div></fieldset>
+        <fieldset class="grp"><legend><b>Какой у тебя уровень?</b></legend><div class="chips">${C.LEVELS.map(l => chip("level", l.id, l.label, (me.level || 1) === l.id)).join("")}</div></fieldset>
+        <fieldset class="grp"><legend><b>Сколько дней в неделю?</b></legend>${nums("days", [2, 3, 4, 5, 6], me.days || 3)}</fieldset>
+        <fieldset class="grp"><legend><b>Сколько минут на тренировку?</b></legend>${nums("minutes", PL.MINUTES, me.minutes || 30, " мин")}</fieldset>
+        <fieldset class="grp"><legend><b>Где занимаешься?</b></legend><div class="chips">${PL.PLACES.map(p => chip("place", p.id, p.label, (me.place || "home") === p.id)).join("")}</div></fieldset>
+        <fieldset class="grp"><legend><b>Что беспокоит? (необязательно)</b></legend>
+        <div class="chips">${C.LIMITS.map(l => chip("limits", l.id, l.label, (me.limits || []).includes(l.id), "checkbox")).join("")}</div></fieldset>
         <p class="muted">Эти упражнения я не буду ставить в план. При заболеваниях, болях и после травм сначала посоветуйся с врачом.</p>
-        <label><b>Для расчёта питания (необязательно)</b></label>
-        <div class="chips">${chip("sex", "m", "Мужчина", me.sex === "m")}${chip("sex", "f", "Женщина", me.sex === "f")}</div>
-        <div class="row" style="gap:8px">
-          <input name="age" type="number" min="14" max="90" placeholder="Возраст" value="${me.age || ""}" style="width:33%">
-          <input name="height" type="number" min="120" max="230" placeholder="Рост, см" value="${me.height || ""}" style="width:33%">
-          <input name="weight" type="number" min="30" max="300" step="0.5" placeholder="Вес, кг" value="${me.weight || ""}" style="width:33%">
+        <fieldset class="grp"><legend><b>Для расчёта питания (необязательно)</b></legend>
+        <div class="chips">${chip("sex", "m", "Мужчина", me.sex === "m")}${chip("sex", "f", "Женщина", me.sex === "f")}</div></fieldset>
+        <div class="fields3">
+          <label class="fld"><span>Возраст</span><input name="age" type="number" inputmode="numeric" min="14" max="90" value="${me.age || ""}"></label>
+          <label class="fld"><span>Рост, см</span><input name="height" type="number" inputmode="numeric" min="120" max="230" value="${me.height || ""}"></label>
+          <label class="fld"><span>Вес, кг</span><input name="weight" type="number" inputmode="decimal" min="30" max="300" step="0.5" value="${me.weight || ""}"></label>
         </div>
         <div class="status" id="meerr" role="alert"></div>
         <button class="wide" type="submit">Подобрать план</button>
@@ -93,10 +93,10 @@
       if (!e) return "";
       return `<div class="card"><div class="row"><div><b>${n + 1}. ${esc(e.title)}</b>
         <div>${i.sets} × ${esc(i.reps)}${i.rest ? " · отдых " + i.rest + " сек" : ""}</div></div>
-        <a class="pill" href="#/x/${e.id}">${e.video ? "▶ видео" : "техника"}</a></div></div>`;
+        <a class="pill" href="#/x/${e.id}">${e.video ? window.Icons.svg("play", 14) + " видео" : "техника"}</a></div></div>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/plan">← Мой план</a><h1>${esc(day.title)}</h1>
-      <p class="muted">Разомнитесь 3–5 минут, затем выполните план. Если не знаете технику, откройте упражнение.</p>${items}<div id="checkin"></div>`;
+      <p class="muted">Разомнись 3–5 минут, затем выполни план. Если не знаешь технику, открой упражнение.</p>${items}<div id="checkin"></div>`;
     FW.renderCheckin({ id: "plan" }, day, justDone, () => P.planDay(FW, did, true));
   };
 
@@ -132,11 +132,12 @@
       document.getElementById("libcount").textContent = "Найдено упражнений: " + list.length + " из " + C.EXERCISES.length + ". Видео есть у " + C.EXERCISES.filter(e => e.video).length + ".";
       document.getElementById("liblist").innerHTML = list.length ? list.map(e => `<a class="card" href="#/x/${e.id}"><div class="row"><div><b>${esc(e.title)}</b>
         <div class="muted">${esc(e.muscles.map(m => labels[m]).join(", "))} · ${esc(lab(C.EQUIPMENT, e.equipment))} · ${esc(lab(C.LEVELS, e.level))}</div></div>
-        <span class="pill ${e.video ? "done" : ""}">${e.video ? "▶ видео" : "без видео"}</span></div></a>`).join("")
+        <span class="pill">${e.video ? window.Icons.svg("play", 14) + " видео" : "без видео"}</span></div></a>`).join("")
         : "<div class='card'><p class='muted'>Ничего не найдено. Сбросьте фильтры или выберите другую мышцу.</p></div>";
     };
     draw();
-    const pick = m => { lib.muscle = lib.muscle === m ? "" : m; draw(); };
+    // После перерисовки схемы фокус возвращается на ту же зону: с клавиатуры можно выбирать мышцы подряд.
+    const pick = m => { const kb = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.m; lib.muscle = lib.muscle === m ? "" : m; draw(); if (kb) { const z = document.querySelector('#bodywrap [data-m="' + kb + '"]'); if (z && z.focus) z.focus(); } };
     const wrap = document.getElementById("bodywrap");
     wrap.onclick = ev => { const z = ev.target.closest("[data-m]"); if (z) pick(z.dataset.m); };
     wrap.onkeydown = ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.m) { ev.preventDefault(); pick(ev.target.dataset.m); } };
@@ -174,7 +175,7 @@
 
     app.innerHTML = `<h1>Питание</h1>${window.Guide.tip("food")}${P.ideaChips(["A11", "B4"])}<p class="muted">Значения ориентировочные, из справочных таблиц. Это дневник, а не диета и не медицинская рекомендация.</p>
       <div class="card"><div class="row"><div><div class="big">${sum.kcal}</div><div class="muted">ккал из ${goal}</div></div>
-        <div style="text-align:right"><label class="muted">Цель, ккал</label><br><input id="goal" type="number" min="800" max="6000" step="50" value="${goal}" style="width:100px"></div></div>
+        <div style="text-align:right"><label class="muted" for="goal">Цель, ккал</label><br><input id="goal" type="number" min="800" max="6000" step="50" value="${goal}" style="width:100px"></div></div>
         ${bar(sum.kcal, goal)}
         <p class="muted">${sum.kcal > goal ? "Больше цели на " + (sum.kcal - goal) + " ккал: один день ничего не решает." : "Осталось " + (goal - sum.kcal) + " ккал."}</p>
         ${macro("Белки", sum.p, tg && tg.p)}${macro("Жиры", sum.f, tg && tg.f)}${macro("Углеводы", sum.c, tg && tg.c)}
@@ -183,10 +184,10 @@
           : `<p class="muted tiny">Чтобы увидеть ориентир по БЖУ, <a href="#/me" style="text-decoration:underline">укажи пол, возраст, рост и вес</a>.</p>`}</div>
       <h2>Добавить продукт</h2>
       <form id="addf" class="card">
-        <label><b>Продукт или блюдо</b></label>
-        <input id="fsearch" list="foodlist" placeholder="Начни вводить: плов, банан, творог…" autocomplete="off" style="width:100%">
+        <label for="fsearch"><b>Продукт или блюдо</b></label>
+        <input id="fsearch" list="foodlist" placeholder="Плов, банан, творог…" autocomplete="off" style="width:100%">
         <datalist id="foodlist">${N.FOODS.map(f => `<option value="${esc(f.name)}"></option>`).join("")}</datalist>
-        <div class="row" style="margin-top:8px"><div><label class="muted">Масса, г</label><input id="fgrams" type="number" min="1" max="3000" step="1" style="width:110px"></div><div id="fprev" class="muted" style="text-align:right">Выбери продукт</div></div>
+        <div class="row" style="margin-top:8px"><div><label class="muted" for="fgrams">Масса, г</label><input id="fgrams" type="number" min="1" max="3000" step="1" style="width:110px"></div><div id="fprev" class="muted" style="text-align:right">Выбери продукт</div></div>
         <div id="fportion" class="chips"></div>
         <button type="submit" id="faddbtn" disabled>Добавить</button> <span class="status" id="ferr" role="alert"></span>
       </form>
@@ -195,20 +196,21 @@
       <h2>По фото <span class="tag">эксперимент</span></h2>
       <div class="card" id="photobox">
         <p class="muted">Сфотографируй блюдо: модель в браузере подскажет, что это. Массу и состав проверяешь ты: фото не определяет ни порцию, ни масло, ни скрытые ингредиенты. Модель знает общие продукты (фрукты, овощи, пиццу, бургер), но не знает плов, бешбармак, баурсаки: для них выбери вручную выше. Фото не отправляется на сервер.</p>
-        <input type="file" id="photo" accept="image/*" capture="environment">
+        <label class="btn ghost-btn file-btn" for="photo">${window.Icons.svg("share", 18)} Сфотографировать или выбрать фото</label>
+        <input type="file" id="photo" class="visually-hidden" accept="image/*" capture="environment">
         <div id="photoout"></div>
       </div>
       <h2>Своё блюдо</h2>
       <form id="ff" class="card">
-        <div class="row" style="gap:8px"><input name="name" placeholder="Что съел" maxlength="60" style="flex:1" required><input name="kcal" type="number" min="1" max="5000" placeholder="ккал" style="width:90px" required></div>
-        <p class="muted tiny">Если знаешь БЖУ (на упаковке), впиши все три значения на 100 г порции целиком, иначе оставь пустыми.</p>
-        <div class="row" style="gap:8px"><input name="p" type="number" min="0" max="500" step="0.1" placeholder="Белки, г"><input name="f" type="number" min="0" max="500" step="0.1" placeholder="Жиры, г"><input name="c" type="number" min="0" max="800" step="0.1" placeholder="Углев., г"></div>
+        <div class="row" style="gap:8px"><input name="name" placeholder="Название блюда" aria-label="Название блюда" maxlength="60" style="flex:1" required><input name="kcal" type="number" min="1" max="5000" placeholder="ккал" aria-label="Калории на всю порцию" style="width:90px" required></div>
+        <p class="muted tiny">Калории и БЖУ впиши для всей порции, которую съел. Если БЖУ не знаешь, оставь три поля пустыми.</p>
+        <div class="row" style="gap:8px"><input name="p" type="number" min="0" max="500" step="0.1" placeholder="Б, г" aria-label="Белки на порцию, г"><input name="f" type="number" min="0" max="500" step="0.1" placeholder="Ж, г" aria-label="Жиры на порцию, г"><input name="c" type="number" min="0" max="800" step="0.1" placeholder="У, г" aria-label="Углеводы на порцию, г"></div>
         <button type="submit">Добавить</button>
       </form>
       <h2>Сегодня</h2>
       ${items.length ? items.map(({ f, i }) => `<div class="card"><div class="row"><div><b>${esc(f.name)}</b>${f.p != null ? `<div class="muted tiny">${fmtM(f)}</div>` : `<div class="muted tiny">только калории</div>`}</div>
         <div style="text-align:right"><b>${f.kcal}</b> ккал <button class="ghost" data-del="${i}" aria-label="Удалить">${window.Icons.svg("x", 16)}</button></div></div>
-        ${f.nid ? `<div class="row" style="margin-top:6px"><label class="muted">Масса, г</label><input type="number" min="1" max="3000" value="${f.grams}" data-gi="${i}" style="width:100px"></div>` : ""}</div>`).join("") : "<p class='muted'>Пока ничего не добавлено.</p>"}`;
+        ${f.nid ? `<div class="row" style="margin-top:6px"><label class="muted" for="gi${i}">Масса, г</label><input id="gi${i}" type="number" min="1" max="3000" value="${f.grams}" data-gi="${i}" style="width:100px"></div>` : ""}</div>`).join("") : "<p class='muted'>Пока ничего не добавлено.</p>"}`;
 
     const addEntry = (food, grams) => {
       const c = N.calc(food, grams);
@@ -236,7 +238,8 @@
     gr.oninput = refresh;
     document.getElementById("addf").onsubmit = ev => { ev.preventDefault(); if (cur && addEntry(cur, gr.value)) P.food(FW); };
 
-    app.querySelectorAll("[data-quick]").forEach(b => b.onclick = () => { const f = N.byId(b.dataset.quick); if (addEntry(f, f.portion.g)) P.food(FW); });
+    // Быстрое добавление сообщает, что добавлено: список «Сегодня» внизу, без сообщения легко нажать дважды.
+    app.querySelectorAll("[data-quick]").forEach(b => b.onclick = () => { const f = N.byId(b.dataset.quick); if (addEntry(f, f.portion.g)) { P.food(FW); window.FX.toast("Добавлено: " + f.name + ", " + f.portion.label, "check"); } });
     app.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { st.food.splice(+b.dataset.del, 1); FW.save(); P.food(FW); });
     app.querySelectorAll("[data-gi]").forEach(inp => inp.onchange = () => {
       const e = st.food[+inp.dataset.gi], f = e && N.byId(e.nid), c = f && N.calc(f, inp.value);
@@ -251,7 +254,7 @@
       if (!n || !(kcal > 0) || kcal > 5000 || (some && !all)) { window.alert("Проверь: название, калории (1–5000) и БЖУ целиком или совсем без БЖУ."); return; }
       const e = { date: FW.today(), name: n, kcal };
       if (all) Object.assign(e, { p: Number(m[0]), f: Number(m[1]), c: Number(m[2]) });
-      st.food.push(e); FW.save(); P.food(FW);
+      st.food.push(e); FW.save(); P.food(FW); window.FX.toast("Добавлено: " + n, "check");
     };
     document.getElementById("goal").onchange = ev => { const v = Math.round(Number(ev.target.value)); if (v >= 800 && v <= 6000) { st.kcalGoal = v; FW.save(); P.food(FW); } };
     const ut = document.getElementById("usetg");
@@ -302,7 +305,9 @@
   // ---------- идеи команды: кто что предложил и что сделано ----------
   const ST_CLASS = { ready: "ready", partial: "partial", planned: "planned", later: "later" };
   const ideasUi = { who: "", status: "" };
+  // Метки идей команды — служебная информация для показа команде: видны только в режиме Pro.
   P.ideaChips = function (ids) {
+    if (!window.Guide || !window.Guide.isPro()) return "";
     const I = window.Ideas;
     const chips = ids.map(id => I.byId(id)).filter(Boolean).map(i => `<a class="idea-chip" href="#/ideas/${i.id}">${window.Icons.svg("bulb", 14)} ${i.id[0] === "K" ? "Из переписки" : "Идея " + (i.who === "sanya" ? "Сани" : "Айдархана")}: ${i.chip}</a>`).join("");
     return chips ? `<div class="idea-row">${chips}</div>` : "";
@@ -359,9 +364,9 @@
     const avg = rows.length ? Math.round(rows.reduce((s, r) => s + r.hours, 0) / rows.length * 10) / 10 : null;
     const q = ["", "плохо", "так себе", "нормально", "хорошо", "отлично"];
     app.innerHTML = `<a class="back" href="#/">← Главная</a><h1>Сон</h1>${window.Guide.tip("sleep")}${P.ideaChips(["A15"])}
-      <p class="muted">Запиши, сколько ты спал прошлой ночью. Если сна меньше 6 часов, совет дня предложит лёгкую тренировку.</p>
-      <form id="sform" class="card"><div class="row" style="gap:8px"><div><label class="muted">Часов</label><input name="hours" type="number" min="0" max="14" step="0.5" value="7.5" style="width:100px"></div>
-        <div style="flex:1"><label class="muted">Как выспался</label><select name="q" style="width:100%">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === 3 ? "selected" : ""}>${n} · ${q[n]}</option>`).join("")}</select></div></div>
+      <p class="muted">Запиши, сколько длился сон прошлой ночью. Если сна меньше 6 часов, совет дня предложит лёгкую тренировку.</p>
+      <form id="sform" class="card"><div class="row" style="gap:8px"><div><label class="muted" for="shours">Часов</label><input id="shours" name="hours" type="number" min="0" max="14" step="0.5" value="7.5" style="width:100px"></div>
+        <div style="flex:1"><label class="muted" for="sq">Как спалось</label><select id="sq" name="q" style="width:100%">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === 3 ? "selected" : ""}>${n} · ${q[n]}</option>`).join("")}</select></div></div>
         <div class="status" id="serr" role="alert"></div><button class="wide" type="submit">Записать сон за сегодня</button></form>
       ${avg != null ? `<div class="card"><div class="row"><div><div class="big">${avg}</div><div class="muted">ч в среднем за ${rows.length} дн.</div></div></div><p class="muted">${esc(sleepAdvice(avg))}</p></div>` : ""}
       ${rows.map(r => `<div class="card row"><span>${esc(r.date)}</span><span><b>${r.hours}</b> ч · ${esc(q[r.quality] || "")}</span></div>`).join("")}
@@ -369,7 +374,7 @@
     document.getElementById("sform").onsubmit = ev => {
       ev.preventDefault();
       const f = ev.target.elements, h = Math.round(Number(f.hours.value) * 2) / 2, qq = Math.round(Number(f.q.value));
-      if (!(h >= 0 && h <= 14) || !(qq >= 1 && qq <= 5)) { document.getElementById("serr").textContent = "Часы: от 0 до 14, оценка от 1 до 5."; return; }
+      if (String(f.hours.value).trim() === "" || !(h >= 0 && h <= 14) || !(qq >= 1 && qq <= 5)) { document.getElementById("serr").textContent = "Часы: от 0 до 14, оценка от 1 до 5."; return; }
       FW.saveSleep(h, qq);
       P.sleep(FW);
     };
