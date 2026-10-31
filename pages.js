@@ -199,7 +199,8 @@
     const labels = Object.fromEntries(C.MUSCLES.map(m => [m.id, m.label]));
     const meta = `<div class="tags">${e.muscles.map(m => `<span class="pill">${esc(labels[m])}</span>`).join("")}<span class="pill">${esc(lab(C.EQUIPMENT, e.equipment))}</span><span class="pill">${esc(lab(C.LEVELS, e.level))}</span><span class="pill">${esc(lab(C.KINDS, e.kind))}</span></div>` +
       (e.avoid.length ? `<p class="muted">Осторожно при: ${esc(e.avoid.map(a => lab(C.LIMITS, a)).join(", ").toLowerCase())}. Если появилась боль, остановитесь и посоветуйтесь с врачом.</p>` : "") +
-      `<p class="muted tiny">Описание техники даёт общие сведения; его нужно проверить у тренера.</p>`;
+      `<p class="muted tiny">Описание техники даёт общие сведения; его нужно проверить у тренера.</p>` +
+      `<a class="btn ghost-btn wide-btn" href="#/log/ex/${e.id}">Добавить в тренировку</a>`;
     FW.renderExercise({ e, key: e.ref || "lib/" + e.id, backHref: "#/library", backLabel: "← Каталог", points: e.points || 5, meta });
   };
 

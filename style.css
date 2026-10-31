@@ -534,3 +534,15 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .coach-note a { color:var(--accent-text); font-weight:600; }
 .card.today { display:flex; flex-direction:column; gap:4px; border:1px solid var(--accent-soft); }
 .card.today > b { font-size:20px; letter-spacing:-.01em; }
+
+/* Путь: ступени, вопрос новичку, «Ещё разделы» */
+.stg-row { display:flex; flex-wrap:wrap; gap:6px; }
+.stg { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; background:var(--surface-2); color:var(--muted); font-size:13px; font-weight:600; }
+.stg b { display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--line); color:var(--text); font-size:12px; }
+.stg.past { color:var(--text); } .stg.past b { background:var(--accent-soft); color:var(--accent-text); }
+.stg.on { background:var(--accent-soft); color:var(--accent-text); } .stg.on b { background:var(--accent); color:var(--on-accent); }
+.card.path .path-text { margin:10px 0 12px; }
+.stage-ask { margin:12px 0 4px; padding-bottom:10px; border-bottom:1px solid var(--line); } .stage-ask p { margin:2px 0 8px; }
+details.more { margin-top:12px; } details.more > summary { cursor:pointer; padding:12px 14px; border-radius:14px; background:var(--surface); border:1px solid var(--line); font-weight:600; color:var(--muted); list-style:none; }
+details.more > summary::-webkit-details-marker { display:none; }
+details.more[open] > summary { margin-bottom:12px; }

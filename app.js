@@ -493,6 +493,39 @@
     return `<div class="card today"><span class="muted tiny">Сегодня по плану</span><b>${esc(t.title)}</b><div class="muted">${w(t.count)} · около ${t.minutes} мин${t.muscles.length ? " · " + esc(t.muscles.join(", ")) : ""}</div>
       <div class="cl-act wrap"><a class="btn" href="${t.href}">Открыть день</a><a class="btn ghost-btn" href="${t.log}">Записать подходы и веса</a></div></div>`;
   }
+  // ---------- ступень пути ----------
+  // Ступень растёт от тренировок: 3+ тренировок или запись подходов — «Тренируюсь», 12+ тренировок и 4 записи — «Расту».
+  // Выбранная человеком ступень — минимум: опытный может начать сразу с третьей.
+  const STAGES = [null, { n: 1, name: "Начинаю" }, { n: 2, name: "Тренируюсь" }, { n: 3, name: "Расту" }];
+  const earnedStage = () => { const n = workoutDates().length, rec = state.sessions.length; return n >= 12 && rec >= 4 ? 3 : n >= 3 || rec >= 1 ? 2 : 1; };
+  const stageNow = () => Math.max(window.Guide.stage() || 1, earnedStage());
+  const stageChips = s => STAGES.slice(1).map(x => `<span class="stg ${x.n === s ? "on" : x.n < s ? "past" : ""}" ${x.n === s ? 'aria-current="step"' : ""}><b>${x.n}</b>${x.name}</span>`).join("");
+  // Одно главное действие ступени: цепочка «тело → тренировка → запись → статистика → совет».
+  function pathStep(s) {
+    const n = workoutDates().length, rec = state.sessions.length;
+    if (s === 1) return n === 0 ? ["Начни с тела: выбери мышцу, нащупай её у себя и сделай первую тренировку.", "#/library", "Выбрать мышцу"]
+      : ["Сделано " + n + " из 3 тренировок. После третьей откроется ступень «Тренируюсь»: запись подходов, цель на каждую тренировку и мышцы на теле.", nextDayHref(), "К тренировке"];
+    if (s === 2) return rec === 0 ? ["Теперь записывай подходы и веса: сайт подскажет цель на каждую тренировку и покажет, какие мышцы ты нагрузил.", "#/log", "Записать тренировку"]
+      : ["Тренировок " + n + ", с записью подходов " + rec + ". До ступени «Расту»: ещё " + Math.max(12 - n, 0) + " тренировок и " + Math.max(4 - rec, 0) + " с записью.", "#/stats", "Моя статистика"];
+    const adv = window.Stats.coachAdvice(window.Stats.summarize(state.sessions, state.log, "week", dayNum(today()), muscleOfEx, markSets).byMuscle, id => window.Catalog.labelOf(window.Catalog.MUSCLES, id))[0];
+    return adv ? [adv.text, "#/library/" + adv.muscle, "Подобрать упражнения"] : ["Нагрузка сбалансирована. Держи цель на тренировку и добавляй вес, когда дошёл до 12 повторений.", "#/log", "Записать тренировку"];
+  }
+  function pathCardHtml() {
+    const s = stageNow(), [text, href, label] = pathStep(s);
+    return `<div class="card path"><div class="stg-row" role="list" aria-label="Ступени пути">${stageChips(s)}</div>${stageAskHtml()}<p class="path-text">${esc(text)}</p><a class="btn" href="${href}">${label}</a></div>`;
+  }
+  // Вопрос новичку один раз: с какой ступени начать. Пока человек не ответил и не тренировался.
+  function stageAskHtml() {
+    if (window.Guide.stage() || workoutDates().length || state.sessions.length) return "";
+    return `<div class="stage-ask"><b>Ты раньше тренировался?</b><p class="muted tiny">От ответа зависит, что покажем на главной. Поменять можно в Профиле.</p>
+      <div class="cl-act wrap"><button type="button" data-stage="1">Нет, начинаю</button><button type="button" class="ghost" data-stage="2">Немного</button><button type="button" class="ghost" data-stage="3">Давно</button></div></div>`;
+  }
+  function stageCardHtml() {
+    const s = stageNow(), chosen = window.Guide.stage() || 1;
+    return `<div class="card"><b>Моя ступень: ${s}. ${STAGES[s].name}</b><div class="stg-row" style="margin-top:8px">${stageChips(s)}</div>
+      <p class="muted tiny">Ступень растёт сама от тренировок. Выбранная тобой — минимум: если опытен, начни выше. Сейчас выбрано: ${chosen}.</p>
+      <div class="cl-act wrap">${[1, 2, 3].map(n => `<button type="button" class="${n === chosen ? "" : "ghost"}" data-stage="${n}" aria-pressed="${n === chosen}">${n}. ${STAGES[n].name}</button>`).join("")}</div></div>`;
+  }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
     const head = `<div class="greet"><h1>Привет, ${esc(displayName())}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
@@ -509,8 +542,15 @@
     const body = Gd.show("progress") ? linkRow("#/body", "scale", "Вес и рост", "История замеров и график", "") : "";
     const proBlock = pro ? (anon ? "" : PAGES.accountCard(FW)) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${ic(p.icon || "dumbbell", 30)}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : PAGES.proTeaser();
+    // Ступень решает, что на главной сверху, а что в «Ещё». В Pro всё на виду, как раньше.
+    const s = stageNow(), seen = window.Guide.stageSeen();
+    if (seen && s > seen && window.FX && window.FX.toast) window.FX.toast("Новая ступень: " + STAGES[s].name, "star");
+    if (s !== seen && (s > 1 || seen)) window.Guide.markStageSeen(s); // у нового человека настройки не пишем, пока он ничего не выбрал
     const hasToday = !!todayCardHtml(), advHero = hasToday && adviceNow().kind === "go" ? "" : advice;
-    app.innerHTML = head + loginRow + install + steps + (hasToday && adviceNow().kind === "checkin" ? todayCardHtml() + advHero : advHero + todayCardHtml()) + trainingRowsHtml() + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
+    const flow = (hasToday && adviceNow().kind === "checkin" ? todayCardHtml() + advHero : advHero + todayCardHtml()) + trainingRowsHtml() + weekCardHtml();
+    const more = html => (!pro && html.trim() ? `<details class="more"><summary>Ещё разделы</summary>${html}</details>` : html);
+    const rest = s === 1 ? more(food + sleep + body + levelCardHtml() + planCardHtml() + proBlock) : s === 2 ? food + more(sleep + body + levelCardHtml() + proBlock) + planCardHtml() : food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
+    app.innerHTML = head + loginRow + install + pathCardHtml() + steps + flow + rest;
     animateBars();
   }
 
@@ -732,6 +772,7 @@
     app.innerHTML = `<h1>Профиль</h1>
       ${PAGES.accountCard(FW)}
       ${trainerRow}
+      ${stageCardHtml()}
       ${PAGES.settingsCard()}
       ${installCard}
       ${pro ? PAGES.ideasCard() : ""}
@@ -851,6 +892,8 @@
     nav: () => navId, stale: id => id !== navId, newId, finishSession, removeSession, quickMark, muscleOf: muscleOfEx, markSets };
   window.addEventListener("hashchange", route);
   // Приложение открыто в двух вкладках (или установленное приложение и браузер): берём свежие данные, чтобы не затереть чужие записи.
+  // Выбор ступени (вопрос на главной и карточка в профиле): настройки перерисовывают страницу сами.
+  app.addEventListener("click", ev => { const b = ev.target.closest ? ev.target.closest("[data-stage]") : null; if (b) window.Guide.setStage(Number(b.dataset.stage)); });
   window.addEventListener("storage", e => { if (e.key === KEY) { state = load(); renderBadge(); route(true); } });
   // Изменился вход/выход: обновляем страницы, где виден аккаунт. Без сервера приложение работает как раньше.
   // Вкладка «Клиенты» видна только подтверждённым тренерам.

@@ -171,3 +171,17 @@ test("приветствие при заходе: пока не вошёл; по
   assert.equal(G.shouldWelcome(false), true);
   assert.deepEqual(seen, ["welcome", "welcome"]);
 });
+
+test("ступень пути: по умолчанию не выбрана, хранится 1–3, мусор отбрасывается, смена сообщает подписчикам", () => {
+  const st = fakeStorage(), G = fresh(st);
+  assert.equal(G.stage(), 0);
+  assert.equal(G.stageSeen(), 0);
+  assert.equal(st.getItem(G.KEY), null, "чтение ничего не записывает");
+  let fired = 0; G.onPrefs(() => { fired++; });
+  G.setStage(2);
+  assert.equal(G.stage(), 2); assert.equal(fired, 1);
+  G.setStage(7); assert.equal(G.stage(), 0, "неизвестная ступень сбрасывается");
+  G.markStageSeen(3); assert.equal(G.stageSeen(), 3); assert.equal(fired, 2, "отметка «видел» подписчиков не тревожит");
+  st.setItem(G.KEY, JSON.stringify({ stage: "2", stageSeen: 9 }));
+  assert.equal(G.stage(), 0); assert.equal(G.stageSeen(), 0, "строки и числа вне 1–3 не принимаются");
+});

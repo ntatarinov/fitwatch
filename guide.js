@@ -19,7 +19,7 @@
   const MODULE_IDS = MODULES.map(m => m.id);
   const LITE_DEFAULT = ["food"];
 
-  const defaults = () => ({ mode: "lite", onboarded: false, tips: {}, stepsHidden: false, installHidden: false, modules: null, theme: "auto", welcomeOff: false });
+  const defaults = () => ({ mode: "lite", onboarded: false, tips: {}, stepsHidden: false, installHidden: false, modules: null, theme: "auto", welcomeOff: false, stage: 0, stageSeen: 0 });
   const cleanModules = m => (Array.isArray(m) ? MODULE_IDS.filter(id => m.includes(id)) : null);
   function read() {
     let raw = null;
@@ -37,6 +37,8 @@
       modules: cleanModules(p.modules),
       theme: THEMES.includes(p.theme) ? p.theme : "auto",
       welcomeOff: p.welcomeOff === true,
+      stage: [1, 2, 3].includes(p.stage) ? p.stage : 0,
+      stageSeen: [1, 2, 3].includes(p.stageSeen) ? p.stageSeen : 0,
     };
   }
   function write(p) {
@@ -162,6 +164,13 @@
   }
   function dismissTip(id) { if (known(id)) patch(p => { p.tips[id] = true; }); }
   function resetTips() { patch(p => { p.tips = {}; p.stepsHidden = false; p.installHidden = false; }); }
+
+  // ---------- ступень пути: 1 «Начинаю», 2 «Тренируюсь», 3 «Расту» ----------
+  // Выбранная человеком ступень (0 — ещё не отвечал). Реальная ступень в app.js не ниже выбранной и растёт от тренировок.
+  const stage = () => read().stage;
+  function setStage(n) { patch(p => { p.stage = [1, 2, 3].includes(n) ? n : 0; }); fire(prefListeners, "stage"); }
+  const stageSeen = () => read().stageSeen;
+  const markStageSeen = n => patch(p => { p.stageSeen = [1, 2, 3].includes(n) ? n : 0; });
 
   // ---------- приветствие ----------
   const needsOnboarding = () => !read().onboarded;
@@ -300,7 +309,7 @@
     return { go, finish, get index() { return i; }, get slides() { return list().length; }, get picked() { return [...picked]; } };
   }
 
-  const api = { KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, slidesFor, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, welcomeEnabled, setWelcome, shouldWelcome, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
+  const api = { stage, setStage, stageSeen, markStageSeen, KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, slidesFor, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, welcomeEnabled, setWelcome, shouldWelcome, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
   root.Guide = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

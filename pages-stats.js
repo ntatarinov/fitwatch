@@ -63,6 +63,13 @@
   // ---------- запись тренировки ----------
   P.log = function (FW, a, b) {
     const { app, esc } = FW, st = FW.state, nav = FW.nav();
+    // Из каталога: «Добавить в тренировку» кладёт упражнение в идущую тренировку (или начинает новую) и открывает запись.
+    if (a === "ex") {
+      const e = C().byId(b); if (!e) return FW.notFound();
+      if (!st.draft) st.draft = blankDraft(FW);
+      if (!st.draft.items.some(i => i.ex === e.id) && st.draft.items.length < 20) st.draft.items.push({ ex: e.id, name: e.title, sets: [newSet(FW, e.id, 0)] });
+      FW.save(); location.replace("#/log"); return;
+    }
     const src = a && b ? { p: a, d: b } : null;
     const go = d => { st.draft = d; FW.save(); P.log(FW); };
 

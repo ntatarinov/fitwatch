@@ -323,6 +323,55 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
     ok(!$(w, ".coach-note"), "за год совета нет: он только про свежую нагрузку");
   }
 
+  // 12. Путь: ступень решает, что на главной; всё связано цепочкой каталог → запись → статистика → совет
+  {
+    const lite = { mode: "lite", onboarded: true, welcomeOff: true };
+    const { w } = boot({ state: {}, ui: lite }); await tick(60);
+    await go(w, "#/", 80);
+    ok(!!$(w, ".stage-ask") && $$(w, ".stage-ask [data-stage]").length === 3, "новому человеку на главной вопрос «С чего начнём?» с тремя ответами");
+    ok(/Начинаю/.test(text(w, ".stg.on")) && /нащупай/.test(text(w, ".path-text")) && $(w, ".card.path a.btn").getAttribute("href") === "#/library", "ступень 1: главное действие — выбрать мышцу и нащупать её");
+    ok(!!$(w, "details.more") && !$(w, "details.more").open, "на ступени 1 второстепенное лежит в закрытом «Ещё разделы»");
+    ok(!JSON.parse(w.localStorage.getItem("fitwatch.ui")).stage, "пока человек не ответил, ступень в настройках не выбрана");
+    click(w, $(w, '.stage-ask [data-stage="3"]')); await tick(60);
+    ok(!$(w, ".stage-ask") && JSON.parse(w.localStorage.getItem("fitwatch.ui")).stage === 3, "ответ «Давно тренируюсь» сохранён, вопрос исчез");
+    ok(/Расту/.test(text(w, ".stg.on")) && !$(w, "details.more"), "ступень 3: главная целиком, без «Ещё»");
+    await go(w, "#/profile", 80);
+    ok(/Моя ступень: 3/.test(text(w, "main")) && $$(w, '[data-stage]').length === 3, "в профиле ступень видна и меняется");
+    click(w, $(w, '[data-stage="1"]')); await tick(60);
+    ok(/Моя ступень: 1/.test(text(w, "main")) && /Сейчас выбрано: 1/.test(text(w, "main")), "без тренировок человек сам может выбрать ступень ниже");
+  }
+  {
+    const lite = { mode: "lite", onboarded: true, welcomeOff: true };
+    const log3 = [3, 2, 1].map(o => ({ date: dayStr(o), p: "start", d: "d" + (4 - o), points: 20, t: "x" }));
+    const { w } = boot({ state: { log: log3 }, ui: lite }); await tick(60);
+    await go(w, "#/", 80);
+    ok(/Тренируюсь/.test(text(w, ".stg.on")) && /записывай подходы/.test(text(w, ".path-text")) && $(w, ".card.path a.btn").getAttribute("href") === "#/log", "после трёх тренировок ступень 2 растёт сама: теперь записывай подходы");
+    ok(!$(w, ".stage-ask"), "вопрос не задаётся тому, кто уже тренируется");
+    await go(w, "#/profile", 80); click(w, $(w, '[data-stage="1"]')); await tick(60);
+    ok(/Моя ступень: 2/.test(text(w, "main")), "выбранная ступень ниже заработанной не опускает: заработанное остаётся");
+    await go(w, "#/", 80);
+    const s2 = boot({ state: { log: log3, sessions: [sess(70, 1, "Грудь", [{ ex: "db_bench", name: "Жим", sets: [{ reps: 8, kg: 30 }] }], 1800)] }, ui: lite }); await tick(60);
+    await go(s2.w, "#/", 80);
+    ok(/с записью подходов 1/.test(text(s2.w, ".path-text")) && $(s2.w, ".card.path a.btn").getAttribute("href") === "#/stats", "со ступенью 2 и записью: путь ведёт в статистику, видно, сколько до «Расту»");
+    const pro = boot({ state: { log: log3 }, ui: { mode: "pro", onboarded: true, welcomeOff: true } }); await tick(60);
+    await go(pro.w, "#/", 80);
+    ok(!$(pro.w, "details.more"), "в Pro всё на виду, «Ещё разделы» нет");
+  }
+  {
+    const { w } = boot({ state: {} }); await tick(60);
+    await go(w, "#/x/squat", 80);
+    const b = $(w, 'a[href="#/log/ex/squat"]');
+    ok(!!b && /Добавить в тренировку/.test(b.textContent), "на странице упражнения есть «Добавить в тренировку»");
+    await go(w, "#/log/ex/squat", 100);
+    ok(w.location.hash === "#/log" && $$(w, ".lg-ex").length === 1 && /Приседания/.test(text(w, ".lg-ex")), "упражнение из каталога легло в тренировку, открыта запись");
+    await go(w, "#/log/ex/squat", 100);
+    ok($$(w, ".lg-ex").length === 1, "то же упражнение второй раз не дублируется");
+    await go(w, "#/log/ex/plank", 100);
+    ok($$(w, ".lg-ex").length === 2 && stateOf(w).draft.items.length === 2, "другое упражнение добавляется в идущую тренировку, прежние на месте");
+    await go(w, "#/log/ex/nonexistent", 60);
+    ok(/Не найдено/.test(text(w, "main")), "несуществующее упражнение даёт «Не найдено»");
+  }
+
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error("СБОЙ СЦЕНАРИЯ:", e); process.exit(2); });
