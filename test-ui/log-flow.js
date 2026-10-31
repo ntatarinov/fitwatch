@@ -293,6 +293,36 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
     ok(!w.document.getElementById("qsave") && /каждый день уже есть тренировка/.test(text(w, "main")), "если все 7 дней заняты, об этом сказано, а кнопки нет");
   }
 
+  // 11. Взгляд тренера: сегодняшний день на главной, цель в записи, совет по перекосу
+  {
+    const { w } = boot({ state: {} }); await tick(60);
+    await go(w, "#/", 80);
+    ok(!!$(w, ".card.today") && /Сегодня по плану/.test(text(w, ".card.today")) && /День 1/.test(text(w, ".card.today")) && /\d+ мин/.test(text(w, ".card.today")) && /упражнени/.test(text(w, ".card.today")), "на главной карточка «Сегодня по плану»: день, число упражнений, время");
+    ok(!!$(w, '.card.today a[href^="#/log/start/"]') && !!$(w, '.card.today a[href^="#/d/start/"]'), "из неё можно открыть день или сразу записать подходы");
+    const done = boot({ state: { log: [{ date: dayStr(0), p: "start", d: "d1", points: 20, t: "x" }] } }); await tick(60);
+    await go(done.w, "#/", 80);
+    ok(!$(done.w, ".card.today"), "если сегодня тренировка уже есть, карточки «Сегодня» нет");
+  }
+  {
+    const prev = sess(60, 3, "Грудь", [{ ex: "db_bench", name: "Жим гантелей лёжа", sets: [{ reps: 12, kg: 24 }, { reps: 10, kg: 24 }] }, { ex: "pushup", name: "Отжимания", sets: [{ reps: 10, kg: 0 }] }], 3000);
+    const { w } = boot({ state: { sessions: [prev] } }); await tick(60);
+    await go(w, "#/log", 60); click(w, w.document.getElementById("lrepeat")); await tick(60);
+    const goals = $$(w, ".lg-goal").map(e => e.textContent.replace(/\s+/g, " "));
+    ok(goals.length === 2 && /Цель: 8 × 26,5 кг/.test(goals[0]) && /в прошлый раз 12 × 24 кг/.test(goals[0]) && /добавь вес/.test(goals[0]), "в записи у жима цель: добавить вес после 12 повторений: " + goals[0]);
+    ok(/Цель: 11 повт\./.test(goals[1]), "у отжиманий цель: на повторение больше: " + goals[1]);
+    const none = boot({ state: {} }); await tick(60);
+    await go(none.w, "#/log", 60); click(none.w, none.w.document.getElementById("lblank")); await tick(60);
+    ok($$(none.w, ".lg-goal").length === 0, "без прошлых записей цели нет");
+  }
+  {
+    const heavy = [sess(61, 1, "Грудь", [{ ex: "db_bench", name: "Жим", sets: Array.from({ length: 8 }, () => ({ reps: 10, kg: 24 })) }], 3000), sess(62, 2, "Плечи", [{ ex: "db_press", name: "Жим сидя", sets: Array.from({ length: 4 }, () => ({ reps: 10, kg: 14 })) }], 2400)];
+    const { w } = boot({ state: { sessions: heavy } }); await tick(60);
+    await go(w, "#/stats/week", 80);
+    ok(!!$(w, ".coach-note") && /Совет тренера/.test(text(w, ".coach-note")) && /Спину и бицепс/.test(text(w, ".coach-note")) && !!$(w, '.coach-note a[href="#/library/lats"]'), "по перекосу в сторону жима тренер советует тягу: " + text(w, ".coach-note").slice(0, 80));
+    await go(w, "#/stats/year", 80);
+    ok(!$(w, ".coach-note"), "за год совета нет: он только про свежую нагрузку");
+  }
+
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error("СБОЙ СЦЕНАРИЯ:", e); process.exit(2); });

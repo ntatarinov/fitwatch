@@ -20,6 +20,15 @@
     return null;
   }
   const hintFor = (FW, ex, i) => { const l = lastSets(FW, ex); if (!l) return ""; const s = l[Math.min(i, l.length - 1)]; return s.reps + "×" + String(s.kg).replace(".", ","); };
+  // Цель на сегодня по прошлой тренировке: «9 × 24 кг (в прошлый раз 8 × 24)».
+  const kgTxt = v => String(v).replace(".", ",");
+  function goalLine(FW, ex) {
+    const prev = lastSets(FW, ex), t = prev && S().nextTarget(prev); if (!t) return "";
+    const top = prev.reduce((a, b) => (num(b.kg) > num(a.kg) || (num(b.kg) === num(a.kg) && num(b.reps) > num(a.reps)) ? b : a));
+    const was = top.reps + (num(top.kg) > 0 ? " × " + kgTxt(top.kg) + " кг" : " повт.");
+    const goal = t.kg > 0 ? t.reps + " × " + kgTxt(t.kg) + " кг" : t.reps + " повт.";
+    return `<div class="lg-goal"><b>Цель: ${goal}</b><span class="muted tiny"> · в прошлый раз ${was}${t.kind === "weight" ? ". Дошёл до 12, добавь вес" : ""}</span></div>`;
+  }
   const newSet = (FW, ex, i, base) => ({ reps: "", kg: "", hint: hintFor(FW, ex, i) || base || "" });
   const blankDraft = FW => ({ id: FW.newId(), startedAt: Date.now(), title: "Тренировка", src: null, items: [] });
   const startDay = (FW, src) => {
@@ -87,7 +96,7 @@
     const d = st.draft, save = () => FW.save();
     const volumeNow = () => S().volume(parsed(d));
     const totalsHtml = () => { const v = volumeNow(); return `<span><b>${v.sets}</b> подходов</span><span><b>${esc(S().fmtKg(v.tonnage))}</b></span>`; };
-    const exCard = (it, ii) => `<div class="card lg-ex" data-i="${ii}"><div class="row"><div><b>${esc(it.name)}</b><div class="muted tiny">${esc(((C().byId(it.ex) || {}).muscles || []).map(label).join(", "))}</div></div>
+    const exCard = (it, ii) => `<div class="card lg-ex" data-i="${ii}"><div class="row"><div><b>${esc(it.name)}</b><div class="muted tiny">${esc(((C().byId(it.ex) || {}).muscles || []).map(label).join(", "))}</div>${goalLine(FW, it.ex)}</div>
         <button type="button" class="ghost icon-only" data-rm-ex="${ii}" aria-label="Убрать упражнение ${esc(it.name)}">${ic("x", 16)}</button></div>
       <div class="lg-head"><span>№</span><span>Повторы</span><span>Вес, кг</span><span></span></div>
       ${it.sets.map((s, si) => `<div class="lg-set"><span class="lg-n">${si + 1}</span>
@@ -223,12 +232,15 @@
     const hist = st.sessions.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.startedAt || "") < (b.startedAt || "") ? 1 : -1)).slice(0, 20);
     const tabs = [["week", "Неделя"], ["month", "Месяц"], ["year", "Год"], ["all", "Всё"]].map(([v, l]) => `<a class="seg-b ${per === v ? "on" : ""}" href="#/stats/${v}" aria-current="${per === v}"><b>${l}</b></a>`).join("");
     const empty = !st.sessions.length && !sum.marks;
+    const adv = per === "week" || per === "month" ? S0.coachAdvice(sum.byMuscle, label) : [];
+    const advHtml = adv.length ? `<div class="card coach-note"><b>${ic("bulb", 18)} Совет тренера</b>${adv.map(a => `<p>${esc(a.text)} <a href="#/library/${esc(a.muscle)}">Упражнения</a></p>`).join("")}<p class="muted tiny" style="margin:0">Считается по записанным и отмеченным тренировкам этого периода, это ориентир.</p></div>` : "";
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Статистика</h1>${P.ideaChips(["N1"])}
       <div class="seg stat-tabs" role="navigation" aria-label="Период">${tabs}</div>
       <div class="kpis kpis3"><div class="card kpi"><div class="kv">${sum.workouts}</div><div class="kl">Тренировок</div></div><div class="card kpi"><div class="kv">${sum.seconds ? esc(S0.fmtTime(sum.seconds)) : "—"}</div><div class="kl">Время</div></div><div class="card kpi"><div class="kv">${sum.tonnage ? esc(S0.fmtKg(sum.tonnage)) : "—"}</div><div class="kl">Поднято всего</div></div></div>
       ${sum.marks ? `<p class="muted tiny">${sum.marks} из них отмечены без записи подходов: веса и времени у них нет, а нагрузка на мышцы посчитана примерно по программе или по твоей отметке.</p>` : ""}
       <a class="card row-link" href="#/quick"><span class="oi">${ic("check", 22)}</span><div class="rl-tx"><b>Просто отметить мышцы</b><div class="muted">Не записываешь подходы? Нажми, что тренировал: сегодня или за прошлые дни</div></div><span class="chev" aria-hidden="true">›</span></a>
       <a class="card row-link" href="#/log"><span class="oi">${ic("dumbbell", 22)}</span><div class="rl-tx"><b>${st.draft ? "Продолжить тренировку" : "Записать тренировку"}</b><div class="muted">Подходы, повторения и вес</div></div><span class="chev" aria-hidden="true">›</span></a>
+      ${advHtml}
       ${empty ? `<div class="card"><p style="margin:0">Пока нет тренировок. Есть три способа, и подходят любые: отметь готовую программу сделанной, нажми «Просто отметить мышцы» или запиши подходы и веса. После этого здесь появятся недели, месяцы и уровни мышц.</p></div>` : `
       <div class="card"><div class="row"><b>Уровни мышц</b><span class="muted tiny">${esc({ week: "за неделю", month: "за месяц", year: "за год", all: "за всё время" }[per])}</span></div>
         <div class="stat-figs">${["front", "back"].map(v => window.Body.svg(v, null, labels, { levels, compact: true, levelNames: names })).join("")}</div>

@@ -475,6 +475,24 @@
   function stepsCtx() {
     return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref(), useFood: window.Guide.show("food"), canLogin: window.Account.state.status !== "offline" };
   }
+  // Что делать сегодня: ближайший день плана или программы, коротко и по делу (сколько упражнений, сколько времени, какие мышцы).
+  function todayWork() {
+    const href = nextDayHref(), m = /^#\/(pd|d)\/([^/]+)(?:\/([^/]+))?$/.exec(href); if (!m) return null;
+    const plan = m[1] === "pd", prog = !plan && PROGRAMS.find(x => x.id === m[2]);
+    const day = plan ? state.plan && state.plan.days.find(x => x.id === m[2]) : prog && prog.days.find(x => x.id === m[3]);
+    if (!day || !Array.isArray(day.items) || !day.items.length) return null;
+    const secs = day.items.reduce((a, it) => a + (Number(it.sets) || 3) * (45 + (Number(it.rest) || 0)), 0);
+    const ms = []; day.items.forEach(it => ((window.Catalog.byId(it.ex) || {}).muscles || []).forEach(x => { if (!ms.includes(x)) ms.push(x); }));
+    return { href, title: day.title, count: day.items.length, minutes: Math.max(10, Math.round(secs / 60) + 5), muscles: ms.slice(0, 4).map(x => window.Catalog.labelOf(window.Catalog.MUSCLES, x).toLowerCase()),
+      log: plan ? "#/log/plan/" + m[2] : "#/log/" + m[2] + "/" + m[3] };
+  }
+  function todayCardHtml() {
+    if (trainedToday()) return "";
+    const t = todayWork(); if (!t) return "";
+    const w = n => n + (n % 10 === 1 && n % 100 !== 11 ? " упражнение" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? " упражнения" : " упражнений");
+    return `<div class="card today"><span class="muted tiny">Сегодня по плану</span><b>${esc(t.title)}</b><div class="muted">${w(t.count)} · около ${t.minutes} мин${t.muscles.length ? " · " + esc(t.muscles.join(", ")) : ""}</div>
+      <div class="cl-act wrap"><a class="btn" href="${t.href}">Открыть день</a><a class="btn ghost-btn" href="${t.log}">Записать подходы и веса</a></div></div>`;
+  }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
     const head = `<div class="greet"><h1>Привет, ${esc(displayName())}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
@@ -491,7 +509,8 @@
     const body = Gd.show("progress") ? linkRow("#/body", "scale", "Вес и рост", "История замеров и график", "") : "";
     const proBlock = pro ? (anon ? "" : PAGES.accountCard(FW)) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${ic(p.icon || "dumbbell", 30)}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : PAGES.proTeaser();
-    app.innerHTML = head + loginRow + install + steps + advice + trainingRowsHtml() + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
+    const hasToday = !!todayCardHtml(), advHero = hasToday && adviceNow().kind === "go" ? "" : advice;
+    app.innerHTML = head + loginRow + install + steps + (hasToday && adviceNow().kind === "checkin" ? todayCardHtml() + advHero : advHero + todayCardHtml()) + trainingRowsHtml() + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
     animateBars();
   }
 
@@ -778,6 +797,8 @@
     stopPlayer();
     ytCallbacks = [];
     const [, a, b, c] = location.hash.split("/");
+    // Страницы, которым на широком экране нужны две колонки; остальные остаются узкой колонкой по центру.
+    app.dataset.page = a || "home"; app.toggleAttribute("data-wide", ["home", "programs", "stats", "library", "machines", "profile", "coach", "food", "ideas", "rating", "body", "guide", "premium", "trainers"].includes(a || "home"));
     if (a === "p") program(b);
     else if (a === "d") day(b, c);
     else if (a === "e") exercise(b, c);

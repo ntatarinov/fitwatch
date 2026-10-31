@@ -84,6 +84,32 @@
   }
 
   const nbsp = " ";
+  // Цель на сегодня по простой схеме тренера (двойная прогрессия): добавил повторение, дошёл до 12 — добавь вес и снова начни с 8.
+  // Своё тело (вес 0): просто на повторение больше. prev — подходы прошлой тренировки этого упражнения.
+  function nextTarget(prev) {
+    const sets = (Array.isArray(prev) ? prev : []).filter(s => s && num(s.reps) > 0);
+    if (!sets.length) return null;
+    const top = sets.reduce((a, b) => (num(b.kg) > num(a.kg) || (num(b.kg) === num(a.kg) && num(b.reps) > num(a.reps)) ? b : a));
+    const kg = Math.max(0, num(top.kg)), reps = Math.round(num(top.reps));
+    if (kg <= 0) return { kind: "rep", reps: reps + 1, kg: 0 };
+    if (reps >= 12) return { kind: "weight", reps: 8, kg: Math.round((kg + (kg < 20 ? 1 : 2.5)) * 10) / 10 };
+    return { kind: "rep", reps: reps + 1, kg };
+  }
+  // Что сказал бы тренер по недельной нагрузке: перекос тянущих и жимовых, забытые ноги, мышцы без нагрузки. byMuscle — из summarize.
+  const GROUPS = { push: ["chest", "shoulders", "triceps"], pull: ["lats", "traps", "biceps"], legs: ["quads", "hamstrings", "glutes", "calves"], core: ["abs", "obliques", "lower_back"] };
+  function coachAdvice(byMuscle, labelOf) {
+    const by = byMuscle || {}, g = {};
+    Object.keys(GROUPS).forEach(k => { g[k] = GROUPS[k].reduce((a, m) => a + (by[m] ? by[m].sets : 0), 0); });
+    const upper = g.push + g.pull, total = upper + g.legs + g.core, out = [];
+    if (total < 6) return out;
+    if (g.push >= 6 && g.pull < g.push * 0.5) out.push({ id: "pull", muscle: "lats", text: "Спину и бицепс ты нагружаешь меньше чем вдвое по сравнению с грудью, плечами и трицепсом (" + g.pull + " подходов против " + g.push + "). Такой перекос тянет плечи вперёд. Добавь тяги." });
+    else if (g.pull >= 6 && g.push < g.pull * 0.5) out.push({ id: "push", muscle: "chest", text: "Грудь, плечи и трицепс заметно отстают от спины (" + g.push + " подходов против " + g.pull + "). Добавь жимы." });
+    if (upper >= 9 && g.legs < upper / 3) out.push({ id: "legs", muscle: "quads", text: "Ноги почти не работали: " + g.legs + " подходов против " + upper + " на верх тела. Это самые большие мышцы, добавь приседания или ягодичный мост." });
+    const none = ["chest", "lats", "shoulders", "quads", "glutes", "abs"].filter(m => !(by[m] && by[m].sets > 0));
+    if (none.length && out.length < 2) out.push({ id: "none", muscle: none[0], text: "За этот период нет нагрузки на: " + none.map(m => (labelOf ? labelOf(m) : m).toLowerCase()).join(", ") + ". Поставь их в следующую тренировку." });
+    return out.slice(0, 2);
+  }
+
   // Вес: до тонны — в килограммах, дальше — в тоннах с одной цифрой после запятой.
   function fmtKg(kg) {
     const v = Math.max(0, num(kg));
@@ -112,7 +138,7 @@
     return body + tail;
   }
 
-  const api = { LEVELS, levelFor, dayNum, dayStr, volume, muscleSets, summarize, levelCounts, weekly, fmtKg, fmtTime, fmtClock, summaryText, PERIODS };
+  const api = { LEVELS, levelFor, dayNum, dayStr, volume, muscleSets, summarize, levelCounts, weekly, fmtKg, fmtTime, fmtClock, summaryText, nextTarget, coachAdvice, PERIODS };
   root.Stats = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -492,3 +492,45 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .feel { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft, rgba(255, 106, 43, .10)); }
 .feel b { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .feel p { margin: 6px 0 0; }
+
+/* ================= Широкий экран: планшет и компьютер ================= */
+@media (min-width:768px) {
+  main { max-width:820px; padding:24px; }
+  main[data-wide] { max-width:980px; }
+  h1 { font-size:34px; }
+}
+@media (min-width:1100px) {
+  body { padding-bottom:0; padding-left:232px; }
+  .top { padding-left:32px; padding-right:32px; }
+  /* Нижнее меню становится левой панелью */
+  .tabbar { top:0; bottom:0; right:auto; width:232px; flex-direction:column; justify-content:flex-start; gap:4px; padding:20px 12px 16px; border-top:0; border-right:1px solid var(--line); }
+  .tabbar a, .tabbar:has(#coachtab:not([hidden])) a { flex:none; display:flex; align-items:center; gap:12px; text-align:left; padding:11px 14px; font-size:15px; border-radius:12px; overflow:visible; }
+  .tabbar a span { margin:0; }
+  .tabbar a.on span { transform:none; }
+  .tabbar a:hover { background:var(--surface-2); }
+  .tabbar a.on { background:var(--accent-soft); }
+  main { max-width:860px; padding:28px 32px 48px; }
+  main[data-wide] { max-width:1180px; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 24px; align-items:start; }
+  /* В двух колонках раскладываются только карточки; заголовки, подписи и подсказки занимают всю ширину */
+  main[data-wide] > :not(.card):not(a.card) { grid-column:1 / -1; }
+  main[data-wide] > .card { margin-top:0; }
+  main[data-wide][data-page="home"] > .greet { margin-bottom:6px; }
+  .lg-total { bottom:16px; }
+  /* Каталог: слева фигура, справа фильтры и список */
+  main[data-page="library"] { grid-template-columns:minmax(0, 480px) minmax(0, 1fr); }
+  main[data-page="library"] > .card:has(#bodywrap) { grid-column:1; grid-row:span 2; position:sticky; top:76px; }
+  main[data-page="library"] > .card:has(#libq) { grid-column:2; }
+  main[data-page="library"] > #liblist { grid-column:2; }
+  .body-svg { max-width:380px; }
+  .b3d { min-height:420px; }
+  .stat-figs .body-svg { max-width:260px; }
+}
+
+/* Цель на сегодня, совет тренера, карточка «сегодня» */
+.lg-goal { margin-top:6px; padding:6px 10px; border-radius:10px; background:var(--accent-soft); color:var(--accent-text); font-size:14px; }
+.lg-goal .muted { color:var(--muted); }
+.coach-note b { display:flex; align-items:center; gap:8px; }
+.coach-note p { margin:8px 0 0; }
+.coach-note a { color:var(--accent-text); font-weight:600; }
+.card.today { display:flex; flex-direction:column; gap:4px; border:1px solid var(--accent-soft); }
+.card.today > b { font-size:20px; letter-spacing:-.01em; }

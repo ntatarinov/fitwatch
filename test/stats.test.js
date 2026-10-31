@@ -109,3 +109,31 @@ test("отметки без подходов окрашивают мышцы п�
   const withSession = S.summarize([{ date: "2026-10-30", durationSec: 600, items: [{ ex: "bench", sets: [{ reps: 10, kg: 50 }, { reps: 10, kg: 50 }] }] }], log.slice(0, 1), "week", today, () => ["chest"], markSets);
   assert.deepEqual([withSession.byMuscle.chest.sets, withSession.byMuscle.chest.est], [6, 4], "записанные и примерные подходы суммируются, примерные видны отдельно");
 });
+
+test("цель на сегодня: двойная прогрессия тренера", () => {
+  const S = require("../stats.js");
+  assert.equal(S.nextTarget(null), null);
+  assert.equal(S.nextTarget([]), null);
+  assert.deepEqual(S.nextTarget([{ reps: 8, kg: 24 }, { reps: 7, kg: 24 }]), { kind: "rep", reps: 9, kg: 24 }, "не дошёл до 12: то же вес, на повторение больше");
+  assert.deepEqual(S.nextTarget([{ reps: 12, kg: 24 }, { reps: 10, kg: 24 }]), { kind: "weight", reps: 8, kg: 26.5 }, "дошёл до 12: добавь вес, начни с 8");
+  assert.deepEqual(S.nextTarget([{ reps: 12, kg: 10 }]), { kind: "weight", reps: 8, kg: 11 }, "лёгкий вес растёт на кг");
+  assert.deepEqual(S.nextTarget([{ reps: 10, kg: 0 }]), { kind: "rep", reps: 11, kg: 0 }, "своё тело: на повторение больше");
+  assert.deepEqual(S.nextTarget([{ reps: 6, kg: 40 }, { reps: 8, kg: 30 }]), { kind: "rep", reps: 7, kg: 40 }, "берётся самый тяжёлый подход");
+});
+
+test("совет тренера: перекос, забытые ноги, мышцы без нагрузки; при малой нагрузке молчит", () => {
+  const S = require("../stats.js");
+  const by = o => Object.fromEntries(Object.keys(o).map(k => [k, { sets: o[k] }]));
+  const lab = m => ({ lats: "Широчайшие", chest: "Грудь", quads: "Квадрицепс", glutes: "Ягодицы", shoulders: "Плечи", abs: "Пресс" }[m] || m);
+  assert.deepEqual(S.coachAdvice(by({ chest: 3, quads: 2 }), lab), [], "меньше 6 подходов — молчим");
+  const a = S.coachAdvice(by({ chest: 8, shoulders: 4, triceps: 3, lats: 2, biceps: 1, quads: 12, glutes: 4, abs: 4 }), lab);
+  assert.equal(a[0].id, "pull");
+  assert.match(a[0].text, /3 подходов против 15/);
+  assert.equal(a[0].muscle, "lats");
+  const legs = S.coachAdvice(by({ chest: 8, lats: 8, shoulders: 4, biceps: 3, quads: 2, glutes: 0, abs: 4 }), lab);
+  assert.ok(legs.some(x => x.id === "legs" && x.muscle === "quads"));
+  assert.ok(legs.length <= 2);
+  const none = S.coachAdvice(by({ chest: 6, lats: 6, shoulders: 4, quads: 8 }), lab);
+  assert.ok(none.some(x => x.id === "none" && /ягодицы, пресс/.test(x.text)));
+  assert.deepEqual(S.coachAdvice(by({ chest: 6, lats: 6, shoulders: 4, quads: 8, glutes: 4, abs: 4 }), lab), [], "всё сбалансировано — совета нет");
+});
