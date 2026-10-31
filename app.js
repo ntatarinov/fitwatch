@@ -222,6 +222,32 @@
   }
   // ---------- тренировки с подходами ----------
   const newId = () => (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => ((Math.random() * 16) | 0).toString(16)));
+  // Примерная нагрузка отметки без записи подходов: подходы дня программы или плана по мышцам упражнений (силовые и на кор), у быстрой отметки по 4 подхода на выбранную мышцу.
+  const QUICK_SETS = 4;
+  function markSets(l) {
+    const known = window.Catalog.MUSCLES.map(m => m.id), out = {};
+    if (l.p === "quick") { (Array.isArray(l.muscles) ? l.muscles : []).forEach(m => { if (known.includes(m)) out[m] = QUICK_SETS; }); return Object.keys(out).length ? out : null; }
+    const prog = l.p === "plan" ? null : PROGRAMS.find(x => x.id === l.p);
+    const day = l.p === "plan" ? state.plan && state.plan.days.find(x => x.id === l.d) : prog && prog.days.find(x => x.id === l.d);
+    if (!day || !Array.isArray(day.items)) return null;
+    day.items.forEach(it => {
+      const e = window.Catalog.byId(it.ex); if (!e || !["strength", "core"].includes(e.kind)) return;
+      const n = Math.max(1, Math.min(10, Math.round(Number(it.sets)) || 3));
+      e.muscles.forEach(m => { out[m] = (out[m] || 0) + n; });
+    });
+    return Object.keys(out).length ? out : null;
+  }
+  // Быстрая отметка: «я тренировал вот эти мышцы» без записи подходов. За любой из последних 7 дней, если в этот день ещё нет тренировки.
+  function quickMark(date, muscles) {
+    const known = window.Catalog.MUSCLES.map(m => m.id), ms = Array.from(new Set(muscles)).filter(m => known.includes(m));
+    const n = dayNum(date), t = dayNum(today());
+    if (!ms.length || !Number.isFinite(n) || n > t || n < t - 6 || state.log.some(l => l.date === date)) return null;
+    const title = "Тренировал: " + ms.map(m => window.Catalog.labelOf(window.Catalog.MUSCLES, m).toLowerCase()).join(", ");
+    const entry = { date, p: "quick", d: "q", points: window.DAY_POINTS, t: title.slice(0, 80), muscles: ms };
+    state.log.push(entry); save();
+    if (window.Account.state.status === "user" || window.Account.state.status === "offline") { entry.pending = true; save(); sendWorkout(entry); }
+    return entry;
+  }
   const muscleOfEx = id => { const e = window.Catalog.byId(id); return e ? e.muscles : []; };
   const num = v => Number(String(v).replace(",", "."));
   // Завершение: черновик → тренировка. Отметка готовой программы за сегодня привязывается к ней (sid), чтобы тренировка не считалась дважды.
@@ -440,7 +466,7 @@
   }
   // Запись тренировки и статистика: две строки на главной и в разделе «Тренировки».
   function trainingRowsHtml() {
-    const d = state.draft, S = window.Stats, week = S.summarize(state.sessions, state.log, "week", dayNum(today()), muscleOfEx);
+    const d = state.draft, S = window.Stats, week = S.summarize(state.sessions, state.log, "week", dayNum(today()), muscleOfEx, markSets);
     const clock = d ? S.fmtClock((Date.now() - d.startedAt) / 1000) : "";
     return linkRow("#/log", "dumbbell", d ? "Продолжить тренировку" : "Записать тренировку", d ? "Идёт уже " + clock + ": " + esc(d.title) : "Подходы, повторения и вес. В конце: сколько поднял и сколько заняло", d ? "Открыть" : "Начать") +
       linkRow("#/stats", "activity", "Моя статистика", week.workouts ? "За неделю: " + week.workouts + " трен." + (week.tonnage ? ", " + S.fmtKg(week.tonnage) : "") + (week.seconds ? ", " + S.fmtTime(week.seconds) : "") : "Недели, месяцы и уровни мышц", "");
@@ -763,6 +789,7 @@
     else if (a === "log") PAGES.log(FW, b, c);
     else if (a === "session") PAGES.session(FW, b, c);
     else if (a === "stats") PAGES.stats(FW, b);
+    else if (a === "quick") PAGES.quick(FW);
     else if (a === "x") PAGES.exercise(FW, b);
     else if (a === "ideas") PAGES.ideas(FW, b);
     else if (a === "sleep") PAGES.sleep(FW);
@@ -785,7 +812,7 @@
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", log: "programs", session: "programs", stats: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", log: "programs", quick: "programs", session: "programs", stats: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     if (keepScroll !== true) window.scrollTo(0, 0);
   }
@@ -800,7 +827,7 @@
   const PAGES = window.PAGES;
   PAGES.stepsCtx = stepsCtx;
   const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; },
-    nav: () => navId, stale: id => id !== navId, newId, finishSession, removeSession, muscleOf: muscleOfEx };
+    nav: () => navId, stale: id => id !== navId, newId, finishSession, removeSession, quickMark, muscleOf: muscleOfEx, markSets };
   window.addEventListener("hashchange", route);
   // Приложение открыто в двух вкладках (или установленное приложение и браузер): берём свежие данные, чтобы не затереть чужие записи.
   window.addEventListener("storage", e => { if (e.key === KEY) { state = load(); renderBadge(); route(true); } });

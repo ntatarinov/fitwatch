@@ -258,6 +258,41 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
     ok(!$(none.w, "#lsendbtn") && /Тренера пока нет/.test(text(none.w, "#lsend")), "без тренера: подсказка выбрать его в разделе «Тренеры»");
   }
 
+  // 10. Не все записывают подходы: отметка программы и быстрая отметка мышц тоже окрашивают фигуру (примерно)
+  {
+    const { w } = boot({ state: { log: [{ date: dayStr(1), p: "start", d: "d1", points: 20, t: "День 1 — знакомство" }] } }); await tick(60);
+    await go(w, "#/stats/week", 80);
+    ok(!/Пока нет тренировок/.test(text(w, "main")) && /Тренировок/.test(text(w, ".kpis3")) && $(w, ".kpis3 .kv").textContent === "1", "отметка готовой программы даёт 1 тренировку");
+    ok($$(w, ".stat-figs .mz.lv-1").length > 0, "мышцы приседаний и планки окрашены по программе (Дерево)");
+    ok(/посчитана примерно/.test(text(w, "main")) && /веса и времени у них нет/.test(text(w, "main")), "экран честно говорит, что нагрузка посчитана примерно");
+    const m = $(w, '.stat-figs [data-m="quads"]'); click(w, m);
+    ok(/примерно 3 по отметкам/.test(text(w, "#mcap")), "подпись мышцы: сколько подходов из отметок: " + text(w, "#mcap"));
+    ok(!!$(w, 'a[href="#/quick"]'), "на экране статистики есть «Просто отметить мышцы»");
+  }
+  {
+    const { w } = boot({ state: {} }); await tick(60);
+    await go(w, "#/stats/week", 60);
+    ok(/Пока нет тренировок/.test(text(w, "main")) && /Просто отметить мышцы/.test(text(w, "main")), "пустая статистика называет три способа, включая быструю отметку");
+    await go(w, "#/quick", 60);
+    ok(w.document.getElementById("qsave").disabled === true, "без выбранных мышц кнопка выключена");
+    click(w, $(w, '#qmus [data-m="chest"]')); click(w, $(w, '#qmus [data-m="shoulders"]'));
+    ok(!w.document.getElementById("qsave").disabled && /Выбрано мышц: 2/.test(text(w, "#qhint")), "выбраны две мышцы, кнопка включена");
+    ok($$(w, "#qdays [data-d]").length === 7, "можно выбрать любой из последних 7 дней");
+    click(w, $(w, '#qdays [data-d="' + dayStr(1) + '"]')); click(w, w.document.getElementById("qsave")); await tick(60);
+    const st = stateOf(w), e = st.log[0];
+    ok(st.log.length === 1 && e.p === "quick" && e.date === dayStr(1) && e.muscles.join() === "chest,shoulders" && /грудь, плечи/.test(e.t), "отметка за вчера сохранена: " + JSON.stringify(e));
+    ok(w.location.hash === "#/stats" || w.location.hash.startsWith("#/stats"), "после отметки открывается статистика");
+    await go(w, "#/stats/week", 80);
+    ok($(w, ".kpis3 .kv").textContent === "1" && $$(w, ".stat-figs .mz.lv-1").length > 0, "в статистике 1 тренировка, мышцы окрашены");
+    await go(w, "#/quick", 60);
+    ok($$(w, "#qdays [data-d]").length === 6 && !$(w, '#qdays [data-d="' + dayStr(1) + '"]'), "день, в который уже есть тренировка, второй раз не предлагается");
+  }
+  {
+    const { w } = boot({ state: { log: Array.from({ length: 7 }, (_, i) => ({ date: dayStr(i), p: "start", d: "d1", points: 20, t: "x" })) } }); await tick(60);
+    await go(w, "#/quick", 60);
+    ok(!w.document.getElementById("qsave") && /каждый день уже есть тренировка/.test(text(w, "main")), "если все 7 дней заняты, об этом сказано, а кнопки нет");
+  }
+
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error("СБОЙ СЦЕНАРИЯ:", e); process.exit(2); });

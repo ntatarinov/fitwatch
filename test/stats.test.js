@@ -92,3 +92,20 @@ test("сообщение тренеру: упражнения, подходы и
   const lt = S.summaryText({ title: "Много", durationSec: 3600, items: long }, "");
   assert.ok(lt.length <= 2000 && /Итого: 720 подходов/.test(lt) && /…\n/.test(lt), "длина " + lt.length);
 });
+
+test("отметки без подходов окрашивают мышцы примерно: по программе и по быстрой отметке, но не вместе с записью и не сверх неё", () => {
+  const S = require("../stats.js");
+  const today = S.dayNum("2026-10-31");
+  const muscleOf = () => [];
+  const markSets = l => (l.p === "quick" ? { chest: 4 } : l.p === "start" ? { quads: 3, glutes: 3 } : null);
+  const log = [{ date: "2026-10-30", p: "quick", d: "q", muscles: ["chest"] }, { date: "2026-10-29", p: "start", d: "d1" }, { date: "2026-10-28", p: "nosuch", d: "x" }, { date: "2026-10-27", p: "start", d: "d1", sid: "s1" }];
+  const r = S.summarize([], log, "week", today, muscleOf, markSets);
+  assert.equal(r.marks, 3, "отметка с sid уже учтена записью");
+  assert.equal(r.estimated, true);
+  assert.deepEqual([r.byMuscle.chest.sets, r.byMuscle.chest.est, r.byMuscle.quads.sets, r.byMuscle.quads.level], [4, 4, 3, 1]);
+  assert.equal(r.sets, 0, "подходы в общий счёт подходов не попадают: их никто не записывал");
+  assert.equal(r.tonnage, 0);
+  assert.equal(S.summarize([], log, "week", today, muscleOf).estimated, false, "без оценщика ничего не придумывается");
+  const withSession = S.summarize([{ date: "2026-10-30", durationSec: 600, items: [{ ex: "bench", sets: [{ reps: 10, kg: 50 }, { reps: 10, kg: 50 }] }] }], log.slice(0, 1), "week", today, () => ["chest"], markSets);
+  assert.deepEqual([withSession.byMuscle.chest.sets, withSession.byMuscle.chest.est], [6, 4], "записанные и примерные подходы суммируются, примерные видны отдельно");
+});

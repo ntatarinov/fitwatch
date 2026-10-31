@@ -216,7 +216,7 @@
     const { app, esc } = FW, st = FW.state, S0 = S();
     const per = ["week", "month", "year", "all"].includes(period) ? period : "week";
     const todayNum = S0.dayNum(FW.today()), names = Object.fromEntries(S0.LEVELS.map(l => [l.id, l.label]));
-    const sum = S0.summarize(st.sessions, st.log, per, todayNum, FW.muscleOf), weeks = S0.weekly(st.sessions, st.log, todayNum, 8);
+    const sum = S0.summarize(st.sessions, st.log, per, todayNum, FW.muscleOf, FW.markSets), weeks = S0.weekly(st.sessions, st.log, todayNum, 8);
     const labels = Object.fromEntries(C().MUSCLES.map(m => [m.id, m.label]));
     const levels = {}; Object.keys(sum.byMuscle).forEach(m => { levels[m] = sum.byMuscle[m].level; });
     const counts = S0.levelCounts(sum.byMuscle), keys = Object.keys(sum.byMuscle).sort((a, b) => sum.byMuscle[b].sets - sum.byMuscle[a].sets);
@@ -226,14 +226,15 @@
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Статистика</h1>${P.ideaChips(["N1"])}
       <div class="seg stat-tabs" role="navigation" aria-label="Период">${tabs}</div>
       <div class="kpis kpis3"><div class="card kpi"><div class="kv">${sum.workouts}</div><div class="kl">Тренировок</div></div><div class="card kpi"><div class="kv">${sum.seconds ? esc(S0.fmtTime(sum.seconds)) : "—"}</div><div class="kl">Время</div></div><div class="card kpi"><div class="kv">${sum.tonnage ? esc(S0.fmtKg(sum.tonnage)) : "—"}</div><div class="kl">Поднято всего</div></div></div>
-      ${sum.marks ? `<p class="muted tiny">${sum.marks} из них отмечены без записи подходов: у них нет веса и времени. Чтобы они считались, записывай подходы.</p>` : ""}
+      ${sum.marks ? `<p class="muted tiny">${sum.marks} из них отмечены без записи подходов: веса и времени у них нет, а нагрузка на мышцы посчитана примерно по программе или по твоей отметке.</p>` : ""}
+      <a class="card row-link" href="#/quick"><span class="oi">${ic("check", 22)}</span><div class="rl-tx"><b>Просто отметить мышцы</b><div class="muted">Не записываешь подходы? Нажми, что тренировал: сегодня или за прошлые дни</div></div><span class="chev" aria-hidden="true">›</span></a>
       <a class="card row-link" href="#/log"><span class="oi">${ic("dumbbell", 22)}</span><div class="rl-tx"><b>${st.draft ? "Продолжить тренировку" : "Записать тренировку"}</b><div class="muted">Подходы, повторения и вес</div></div><span class="chev" aria-hidden="true">›</span></a>
-      ${empty ? `<div class="card"><p style="margin:0">Пока нет тренировок. Запиши первую или отметь готовую программу, и здесь появятся недели, месяцы и уровни мышц.</p></div>` : `
+      ${empty ? `<div class="card"><p style="margin:0">Пока нет тренировок. Есть три способа, и подходят любые: отметь готовую программу сделанной, нажми «Просто отметить мышцы» или запиши подходы и веса. После этого здесь появятся недели, месяцы и уровни мышц.</p></div>` : `
       <div class="card"><div class="row"><b>Уровни мышц</b><span class="muted tiny">${esc({ week: "за неделю", month: "за месяц", year: "за год", all: "за всё время" }[per])}</span></div>
         <div class="stat-figs">${["front", "back"].map(v => window.Body.svg(v, null, labels, { levels, compact: true, levelNames: names })).join("")}</div>
         <div class="lv-legend">${[4, 3, 2, 1].map(l => `<span class="lv-chip lv-${l}"><i></i>${esc(names[l])}: ${counts[l]}</span>`).join("")}</div>
         <p class="muted tiny" id="mcap" role="status" style="min-height:1.4em">Нажми на мышцу, чтобы увидеть подробности.</p>
-        <p class="muted tiny" style="margin-bottom:0">Уровень зависит от числа рабочих подходов на мышцу в неделю: Дерево — до 5, Бронза — 5–9, Серебро — 10–14, Золото — от 15. Это ориентир, а не оценка.</p></div>
+        <p class="muted tiny" style="margin-bottom:0">Уровень зависит от числа рабочих подходов на мышцу в неделю: Дерево — до 5, Бронза — 5–9, Серебро — 10–14, Золото — от 15. Это ориентир, а не оценка.${sum.estimated ? " Часть нагрузки посчитана примерно: по отметкам программ и по быстрым отметкам, а не по записанным подходам." : ""}</p></div>
       <div class="card"><b>Вес по неделям</b><p class="muted tiny" style="margin:2px 0 0">тонн за каждые 7 дней, последние 8 недель</p>${window.Charts.bars(weeks.map(w => ({ label: dd(w.from), value: Math.round(w.tonnage / 100) / 10 })), { label: "Поднятый вес по неделям, тонн" })}</div>
       <div class="card"><b>Тренировок по неделям</b>${window.Charts.bars(weeks.map(w => ({ label: dd(w.from), value: w.workouts })), { label: "Тренировок по неделям" })}</div>
       ${keys.length ? `<div class="card"><b>Нагрузка по мышцам</b>${keys.map(m => { const x = sum.byMuscle[m], max = sum.byMuscle[keys[0]].sets; return `<div class="mrow"><span>${esc(label(m))}</span><span class="muted tiny">${x.sets} подх. · ${esc(names[x.level])}</span><div class="bar"><i class="lv-fill lv-${x.level}" style="width:${Math.round(x.sets / max * 100)}%"></i></div></div>`; }).join("")}</div>` : ""}
@@ -246,7 +247,40 @@
       const m = z.dataset.m, x = sum.byMuscle[m];
       app.querySelectorAll(".mz.picked").forEach(e => e.classList.remove("picked"));
       app.querySelectorAll('.mz[data-m="' + m + '"]').forEach(e => e.classList.add("picked"));
-      cap.textContent = x ? label(m) + ": " + names[x.level] + ", " + x.sets + " подходов (" + String(x.perWeek).replace(".", ",") + " в неделю)" : label(m) + ": нагрузки за этот период не было";
+      cap.textContent = x ? label(m) + ": " + names[x.level] + ", " + x.sets + " подходов" + (x.est ? " (из них примерно " + x.est + " по отметкам)" : "") + " (" + String(x.perWeek).replace(".", ",") + " в неделю)" : label(m) + ": нагрузки за этот период не было";
+    };
+  };
+
+  // ---------- быстрая отметка мышц ----------
+  P.quick = function (FW) {
+    const { app, esc } = FW, st = FW.state, C = window.Catalog;
+    const t = S().dayNum(FW.today());
+    const days = []; for (let i = 0; i < 7; i++) { const d = S().dayStr(t - i), busy = st.log.some(l => l.date === d); days.push({ d, label: i === 0 ? "Сегодня" : i === 1 ? "Вчера" : dd(d), busy }); }
+    const free = days.filter(x => !x.busy);
+    let day = (free[0] || {}).d || "", picked = [];
+    const chips = () => C.MUSCLES.map(m => `<button type="button" class="ghost ${picked.includes(m.id) ? "on" : ""}" data-m="${m.id}" aria-pressed="${picked.includes(m.id)}">${esc(m.label)}</button>`).join("");
+    app.innerHTML = `<a class="back" href="#/stats">← Статистика</a><h1>Что ты тренировал</h1>
+      <p class="muted">Не обязательно записывать подходы. Выбери день и мышцы, и статистика посчитает нагрузку примерно (по 4 подхода на мышцу). Веса и времени у такой отметки не будет.</p>
+      ${free.length ? `<div class="card"><b>День</b><div class="chips" id="qdays">${free.map(x => `<button type="button" class="ghost ${x.d === day ? "on" : ""}" data-d="${x.d}">${esc(x.label)}</button>`).join("")}</div>
+        <b style="display:block;margin-top:12px">Мышцы</b><div class="chips" id="qmus">${chips()}</div>
+        <p class="muted tiny" id="qhint" role="status">Выбери хотя бы одну мышцу.</p>
+        <button type="button" class="wide" id="qsave" disabled>Отметить тренировку</button></div>`
+        : `<div class="card"><p style="margin:0">За последние 7 дней в каждый день уже есть тренировка. Открой нужную в статистике или запиши подходы.</p></div>`}
+      <p class="muted tiny">Отметка засчитывается как тренировка дня: баллы и серия, как при отметке программы. Если помнишь подходы, лучше <a href="#/log">запиши их</a>: тогда будут вес и время.</p>`;
+    if (!free.length) return;
+    const draw = () => {
+      document.getElementById("qmus").innerHTML = chips();
+      document.querySelectorAll("#qdays [data-d]").forEach(b => b.classList.toggle("on", b.dataset.d === day));
+      document.getElementById("qsave").disabled = !picked.length;
+      document.getElementById("qhint").textContent = picked.length ? "Выбрано мышц: " + picked.length : "Выбери хотя бы одну мышцу.";
+    };
+    document.getElementById("qmus").onclick = ev => { const b = ev.target.closest("[data-m]"); if (!b) return; const m = b.dataset.m; picked = picked.includes(m) ? picked.filter(x => x !== m) : picked.concat(m); draw(); };
+    document.getElementById("qdays").onclick = ev => { const b = ev.target.closest("[data-d]"); if (!b) return; day = b.dataset.d; draw(); };
+    document.getElementById("qsave").onclick = () => {
+      const e = FW.quickMark(day, picked);
+      if (!e) return;
+      if (window.FX && window.FX.toast) window.FX.toast("Тренировка отмечена", "check");
+      location.hash = "#/stats";
     };
   };
 })();

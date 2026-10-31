@@ -42,7 +42,8 @@
   const inWindow = (date, todayNum, days) => { const n = dayNum(date); return n !== null && n <= todayNum && (days === null || n > todayNum - days); };
 
   // sessions, log — массивы из состояния; period — week | month | year | all.
-  function summarize(sessions, log, period, todayNum, muscleOf) {
+  // markSets(отметка) → { мышца: подходов } или null: примерная нагрузка отмеченной программы или быстрой отметки без записи подходов.
+  function summarize(sessions, log, period, todayNum, muscleOf, markSets) {
     const days = PERIODS[period] === undefined ? 30 : PERIODS[period];
     const ss = (sessions || []).filter(s => inWindow(s.date, todayNum, days));
     // Отметка программы без подходов — тренировка; но если к ней записана сессия (sid) или это запись из логгера (free), она уже учтена.
@@ -54,6 +55,8 @@
       const ms = muscleSets(s, muscleOf || (() => []));
       Object.keys(ms).forEach(m => { muscles[m] = (muscles[m] || 0) + ms[m]; });
     });
+    const est = {};
+    if (markSets) marks.forEach(l => { const ms = markSets(l); if (ms) Object.keys(ms).forEach(m => { muscles[m] = (muscles[m] || 0) + ms[m]; est[m] = (est[m] || 0) + ms[m]; }); });
     // Длина периода для «подходов в неделю»: у «всего» это время от первой тренировки (не меньше недели).
     let span = days;
     if (days === null) {
@@ -62,8 +65,8 @@
     }
     const weeks = Math.max(1, span / 7);
     const byMuscle = {};
-    Object.keys(muscles).forEach(m => { const perWeek = muscles[m] / weeks; byMuscle[m] = { sets: muscles[m], perWeek: Math.round(perWeek * 10) / 10, level: levelFor(perWeek) }; });
-    return { workouts: ss.length + marks.length, sessions: ss.length, marks: marks.length, sets, tonnage: Math.round(kg * 10) / 10, seconds: sec, minutes: Math.round(sec / 60), byMuscle };
+    Object.keys(muscles).forEach(m => { const perWeek = muscles[m] / weeks; byMuscle[m] = { sets: muscles[m], perWeek: Math.round(perWeek * 10) / 10, level: levelFor(perWeek), est: est[m] || 0 }; });
+    return { workouts: ss.length + marks.length, sessions: ss.length, marks: marks.length, estimated: Object.keys(est).length > 0, sets, tonnage: Math.round(kg * 10) / 10, seconds: sec, minutes: Math.round(sec / 60), byMuscle };
   }
   const levelCounts = byMuscle => { const c = { 1: 0, 2: 0, 3: 0, 4: 0 }; Object.keys(byMuscle || {}).forEach(m => { const l = byMuscle[m].level; if (l > 0) c[l]++; }); return c; };
 
