@@ -304,7 +304,7 @@
   const ideasUi = { who: "", status: "" };
   P.ideaChips = function (ids) {
     const I = window.Ideas;
-    const chips = ids.map(id => I.byId(id)).filter(Boolean).map(i => `<a class="idea-chip" href="#/ideas/${i.id}">${window.Icons.svg("bulb", 14)} Идея ${i.who === "sanya" ? "Сани" : "Айдархана"}: ${i.chip}</a>`).join("");
+    const chips = ids.map(id => I.byId(id)).filter(Boolean).map(i => `<a class="idea-chip" href="#/ideas/${i.id}">${window.Icons.svg("bulb", 14)} ${i.id[0] === "K" ? "Из переписки" : "Идея " + (i.who === "sanya" ? "Сани" : "Айдархана")}: ${i.chip}</a>`).join("");
     return chips ? `<div class="idea-row">${chips}</div>` : "";
   };
   P.ideasCard = function () {
@@ -319,21 +319,25 @@
     const card = i => `<div class="card idea st-${ST_CLASS[i.status]} ${focus === i.id ? "hl" : ""}" id="idea-${i.id}">
       <div class="row"><div><span class="who">${esc(I.PEOPLE.find(p => p.id === i.who).name)}</span> <span class="st ${i.status}">${I.STATUS_LABEL[i.status]}</span></div><span class="muted tiny">${i.id}</span></div>
       <b>${esc(i.title)}</b>
+      ${i.ask ? `<p class="ask">Просьба: «${esc(i.ask)}»</p>` : ""}
       ${i.done ? `<p class="doneline">${window.Icons.svg("check", 16)}<span>Сделано: ${esc(i.done)}</span></p>` : ""}
       <p class="muted">Чего не хватает: ${esc(i.missing)}${i.when ? " · " + esc(i.when) : ""}</p>
+      ${i.basedOn ? `<p class="muted tiny">Статус общий с идеей Сани ${i.basedOn.join(", ")}: одна и та же возможность оценивается одинаково.</p>` : ""}
       ${i.where ? `<a class="btn" href="${i.where}">Посмотреть</a>` : ""}</div>`;
     const person = p => { const sm = I.summary(I.forWho(p.id)); return `<div class="card person"><div class="row"><b>${esc(p.name)}</b><span class="pct">${sm.pct}%</span></div>
-      <div class="xp" style="margin:8px 0"><i style="width:${sm.pct}%"></i></div><div class="muted tiny">Готово ${sm.ready} · частично ${sm.partial} · в плане и позже ${sm.notDone} из ${sm.total}</div></div>`; };
+      <div class="xp" style="margin:8px 0"><i style="width:${sm.pct}%"></i></div><div class="muted tiny">Готово ${sm.ready} · частично ${sm.partial} · в плане и позже ${sm.notDone} из ${sm.total}</div><div class="muted tiny" style="margin-top:2px">по ${p.id === "sanya" ? "его описанию" : "его списку"}: ${sm.total} ${p.id === "sanya" ? "пунктов" : "идей"}</div></div>`; };
     FW.app.innerHTML = `<a class="back" href="#/profile">← Профиль</a><h1>Идеи команды</h1>
       <p class="muted">Что предложили Саня и Айдархан и что с этим сделано. Нажми «Посмотреть», чтобы открыть функцию.</p>
       <div class="persons">${I.PEOPLE.map(person).join("")}</div>
       <p class="muted tiny">Считаем так: готово = 1, частично = 0,5. Цифры по коду и тестам; проверка на разных телефонах впереди.</p>
-      <h2>Главное по просьбе Айдархана</h2>${I.PRIORITIES.map(card).join("")}
       <h2>Все идеи</h2>
       <div class="chips" id="ideafilters">
         ${[["", "Все"], ["sanya", "Саня"], ["aidarkhan", "Айдархан"]].map(([v, l]) => `<button class="ghost ${ideasUi.who === v ? "on" : ""}" data-who="${v}" type="button">${l}</button>`).join("")}
         ${[["", "Любой статус"], ["ready", "Готово"], ["partial", "Частично"], ["planned", "В плане"], ["later", "Позже"]].map(([v, l]) => `<button class="ghost ${ideasUi.status === v ? "on" : ""}" data-st="${v}" type="button">${l}</button>`).join("")}</div>
-      <div id="ideaslist"></div>`;
+      <div id="ideaslist"></div>
+      <h2>Основа платформы из переписки</h2>
+      <p class="muted tiny">Это не 11 идей Айдархана, а то, на чём они держатся: база, библиотека, программы, тренер, данные и подписка (его список «что должно быть в базе» из переписки 31.10). В проценты выше не входит. Если такая же идея есть у Сани, статус у них одинаковый.</p>
+      ${I.FOUNDATION.map(card).join("")}`;
     const draw = () => {
       const list = I.ITEMS.filter(i => (!ideasUi.who || i.who === ideasUi.who) && (!ideasUi.status || i.status === ideasUi.status));
       document.getElementById("ideaslist").innerHTML = list.length ? list.map(card).join("") : "<div class='card'><p class='muted'>Нет идей с такими условиями.</p></div>";

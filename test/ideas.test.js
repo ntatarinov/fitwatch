@@ -36,12 +36,29 @@ test("запланированное не выдаётся за сделанно
   assert.equal(I.byId("A99"), null);
 });
 
-test("главные просьбы Айдархана (К1–К6): статусы честные, готовое ведёт на экран", () => {
-  assert.deepEqual(I.PRIORITIES.map(i => i.id), ["K1", "K2", "K3", "K4", "K5", "K6"]);
-  assert.deepEqual(I.PRIORITIES.map(i => i.status), ["ready", "partial", "ready", "ready", "ready", "ready"]);
-  I.PRIORITIES.filter(i => i.done).forEach(i => assert.ok(i.where, i.id));
-  I.PRIORITIES.filter(i => !i.done).forEach(i => assert.equal(i.where, "", i.id + ": запланированное не должно вести на экран"));
-  assert.ok(I.PRIORITIES.every(i => i.status === "ready" || i.status === "partial" || !i.where));
+test("у каждой из 11 идей Айдархана есть его формулировка, статусы и числа сходятся со списком", () => {
+  const b = I.forWho("aidarkhan");
+  assert.deepEqual(b.map(i => i.id), ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11"]);
+  assert.deepEqual(b.map(i => i.status), ["later", "planned", "later", "partial", "later", "partial", "partial", "planned", "later", "partial", "later"]);
+  b.forEach(i => assert.ok(i.ask.length > 40 && /[.)]$/.test(i.ask), i.id + ": формулировка Айдархана"));
+  assert.deepEqual(b.map(i => i.chip).slice(0, 3), ["магазин", "справочник тренажёров", "трекер шагов"]);
+});
+
+test("основа из переписки: не входит в проценты, а статус совпадает со статусом такой же идеи Сани", () => {
+  assert.deepEqual(I.FOUNDATION.map(i => i.id), ["K1", "K2", "K3", "K4", "K5", "K6"]);
+  assert.equal(I.summary(I.forWho("aidarkhan")).total, 11, "К-пункты не входят в проценты");
+  assert.ok(!I.ITEMS.some(i => i.id[0] === "K"));
+  const rank = { later: 0, planned: 1, partial: 2, ready: 3 };
+  I.FOUNDATION.filter(f => f.basedOn).forEach(f => {
+    const worst = f.basedOn.map(id => I.byId(id).status).reduce((a, c) => (rank[a] <= rank[c] ? a : c));
+    assert.equal(f.status, worst, f.id + " расходится с " + f.basedOn.join(","));
+  });
+  assert.deepEqual(I.FOUNDATION.map(i => i.status), ["ready", "partial", "partial", "partial", "ready", "partial"]);
+  I.FOUNDATION.filter(i => i.done).forEach(i => assert.ok(i.where, i.id));
   assert.equal(I.byId("K5").chip, "данные, бонусы, рейтинг");
-  assert.equal(I.summary(I.forWho("aidarkhan")).total, 11); // К-пункты не входят в проценты
+});
+
+test("в файле ideas.js нет прежнего названия блока и ссылок на него", () => {
+  const src = require("fs").readFileSync(require("path").join(__dirname, "..", "ideas.js"), "utf8");
+  assert.ok(!/PRIORITIES/.test(src));
 });

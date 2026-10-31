@@ -185,6 +185,19 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   let badLinks = [];
   for (const h of Array.from(new Set(links))) { await go(w, h); if (/Не найдено/.test(text(w, "main")) || text(w, "main").length < 30) badLinks.push(h); }
   ok(badLinks.length === 0, "идеи: все ссылки «Посмотреть» открывают экраны " + badLinks.join(","));
+  await go(w, "#/ideas");
+  const heads = $$(w, "main h2").map(e => e.textContent);
+  ok(!/Главное по просьбе/.test(text(w, "main")), "идеи: прежнего блока «Главное по просьбе Айдархана» нет");
+  ok(heads.indexOf("Все идеи") >= 0 && heads.indexOf("Основа платформы из переписки") > heads.indexOf("Все идеи"), "идеи: «Основа платформы из переписки» стоит ниже списка идей, отдельным блоком");
+  ok(/не 11 идей Айдархана/.test(text(w, "main")) && /В проценты выше не входит/.test(text(w, "main")), "идеи: подписано, что основа не его идеи и в проценты не входит");
+  ok($$(w, "#ideaslist .idea").length === 44 && $$(w, ".idea").length === 50, "идеи: 44 идеи в списке и 6 пунктов основы отдельно");
+  click(w, $(w, '[data-who="aidarkhan"]'));
+  ok($$(w, "#ideaslist .idea").length === 11 && $$(w, "#ideaslist .idea .ask").length === 11, "идеи: у всех 11 идей Айдархана показана его формулировка");
+  ok(/Встроенный маркетплейс/.test(text(w, "#idea-B1")) && /жим ногами/.test(text(w, "#idea-B2")), "идеи: тексты идей взяты из его списка");
+  click(w, $(w, '[data-who=""]'));
+  const foundationStatus = $$(w, ".idea").slice(44).map(e => e.querySelector(".st").textContent);
+  ok(foundationStatus.join() === "Готово,Частично,Частично,Частично,Готово,Частично", "идеи: статусы основы совпадают с идеями Сани: " + foundationStatus.join());
+  ok($$(w, ".idea").slice(44).filter(e => /Статус общий с идеей Сани/.test(e.textContent)).length === 4, "идеи: у четырёх пунктов основы указано, с какой идеей Сани статус общий");
   await go(w, "#/ideas/K5");
   ok(!!$(w, "#idea-K5.hl"), "идеи: ссылка с номером подсвечивает идею");
   await go(w, "#/library");

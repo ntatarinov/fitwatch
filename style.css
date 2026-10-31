@@ -371,3 +371,5 @@ button.ghost svg { display:block; }
 .login-card { border-color:var(--accent); }
 .ob-login { display:block; margin:10px auto 0; background:none; color:var(--accent-text); font-weight:650; padding:6px 10px; }
 @media (max-width:400px) { .icon-btn.help { display:none; } .badge { max-width:34vw; } }
+
+.ask { margin:6px 0; padding:8px 12px; border-radius:12px; background:var(--surface-2); color:var(--muted); font-size:14px; font-style:italic; line-height:1.4; }
