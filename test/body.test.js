@@ -43,13 +43,21 @@ test("подписи экранируются", () => {
   assert.ok(!s.includes("<b>"));
 });
 
-test("3D-манекен: все мышцы каталога есть, детали заданы числами, библиотека закреплена по версии", () => {
-  const B3 = require("../body3d.js");
+test("3D-анатомия: модель на месте, в ней все 14 групп мышц, фон и кости, подпись авторов и сжатие", () => {
+  const B3 = require("../body3d.js"), fs = require("fs"), path = require("path");
   const ids = Catalog.MUSCLES.map(m => m.id);
   assert.deepEqual([...B3.muscles()].sort(), [...ids].sort(), "в 3D те же 14 мышц, что в каталоге");
-  const num = v => Array.isArray(v) && v.every(Number.isFinite);
-  B3.MUSCLES.forEach(mu => mu.parts.forEach(p => assert.ok(num(p.p) && p.p.length === 3 && num(p.s) && p.s.every(x => x > 0) && (!p.r || num(p.r)), mu.m)));
-  B3.PARTS.forEach(p => assert.ok(p.e ? num(p.e.p) && num(p.e.s) : num(p.l.a) && num(p.l.b) && p.l.ra > 0 && p.l.rb > 0));
-  assert.match(B3.SRC, /^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r\d+\/three\.min\.js$/, "точная версия библиотеки с cdnjs");
+  const file = path.join(__dirname, "..", B3.MODEL.replace(/^\//, ""));
+  const buf = fs.readFileSync(file);
+  assert.equal(buf.toString("ascii", 0, 4), "glTF", "это GLB");
+  assert.ok(buf.length < 4 * 1024 * 1024, "модель легче 4 МБ: " + buf.length);
+  const jsonLen = buf.readUInt32LE(12), gltf = JSON.parse(buf.toString("utf8", 20, 20 + jsonLen));
+  const nodes = gltf.nodes.map(n => n.name);
+  ids.forEach(id => assert.ok(nodes.includes("m_" + id), "нет группы m_" + id));
+  assert.ok(nodes.includes("base_muscle") && nodes.includes("bone"), "фон из мышц и кости");
+  assert.match(gltf.asset.copyright, /BodyParts3D.*Database Center for Life Science.*CC BY 4\.0/, "подпись авторов в самом файле");
+  assert.ok((gltf.extensionsUsed || []).includes("EXT_meshopt_compression"), "сжатие meshopt");
+  assert.match(B3.CREDIT, /BodyParts3D.*CC BY 4\.0/);
+  B3.LIBS.forEach(u => assert.match(u, /^https:\/\/(cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r128\/|cdn\.jsdelivr\.net\/npm\/three@0\.128\.0\/)/, "библиотеки закреплены по версии: " + u));
   assert.equal(B3.hasWebGL(), false, "без браузера WebGL нет — mount честно откажет");
 });

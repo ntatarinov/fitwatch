@@ -1,7 +1,7 @@
 {
   "name": "fitwatch",
   "private": true,
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "FitWatch: fitness app (static site + one serverless API function, Neon Postgres)",
   "scripts": {
     "test": "node --test test/*.test.js",

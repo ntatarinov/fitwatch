@@ -1,44 +1,22 @@
-// 3D-манекен: тело из гладких объёмных форм, основные поверхностные мышцы — отдельные детали. Крутится пальцем или мышью,
-// мышца выбирается нажатием. Библиотека Three.js грузится только когда человек открывает 3D; без WebGL или без сети — честный отказ.
-// Данные фигуры (PARTS, MUSCLES) — чистые и проверяются тестом; отрисовка в mount().
+// 3D-анатомия: настоящая модель мышц и костей человека (BodyParts3D, © The Database Center for Life Science, CC BY 4.0),
+// собранная в models/anatomy.glb скриптом scripts/build-anatomy.mjs. 14 групп мышц выбираются нажатием, модель крутится
+// пальцем или мышью и приближается двумя пальцами или колёсиком; при выборе камера подлетает к мышце.
+// Three.js, загрузчик и распаковщик сжатия грузятся только при открытии 3D; без WebGL или без сети — честный отказ.
 (function (root) {
   "use strict";
-  const SRC = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
-
-  // Единицы — метры, рост около 1,8. Эллипсоид: p — центр, s — полуоси, r — поворот (рад). Конечность: от a до b, радиусы ra/rb.
-  // mirror: true — деталь повторяется зеркально справа (x → −x).
-  const PARTS = [
-    { e: { p: [0, 1.64, 0], s: [0.095, 0.115, 0.105] } },                                   // голова
-    { l: { a: [0, 1.47, 0], b: [0, 1.56, 0.005], ra: 0.05, rb: 0.045 } },                    // шея
-    { e: { p: [0, 1.28, 0], s: [0.175, 0.24, 0.11] } },                                     // грудная клетка
-    { e: { p: [0, 1.02, 0], s: [0.15, 0.13, 0.1] } },                                       // живот и таз
-    { e: { p: [0.2, 1.42, 0], s: [0.06, 0.055, 0.06] }, mirror: true },                     // плечевой сустав
-    { l: { a: [0.215, 1.4, 0], b: [0.25, 1.13, 0], ra: 0.052, rb: 0.042 }, mirror: true },  // плечо
-    { l: { a: [0.25, 1.13, 0], b: [0.27, 0.88, 0.02], ra: 0.042, rb: 0.03 }, mirror: true }, // предплечье
-    { e: { p: [0.275, 0.82, 0.025], s: [0.03, 0.06, 0.018] }, mirror: true },               // кисть
-    { l: { a: [0.095, 0.93, 0], b: [0.105, 0.52, 0.01], ra: 0.088, rb: 0.06 }, mirror: true }, // бедро
-    { l: { a: [0.105, 0.5, 0.01], b: [0.11, 0.1, 0], ra: 0.056, rb: 0.036 }, mirror: true },   // голень
-    { e: { p: [0.11, 0.035, 0.04], s: [0.04, 0.03, 0.09] }, mirror: true },                  // стопа
+  const LIBS = [
+    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",
+    "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js",
   ];
-
-  // Мышцы: детали чуть выступают над телом, чтобы их было видно и удобно нажимать.
-  const MUSCLES = [
-    { m: "neck", parts: [{ p: [0.025, 1.51, 0.035], s: [0.018, 0.05, 0.02], r: [0.2, 0, -0.35], mirror: true }] },
-    { m: "traps", parts: [{ p: [0, 1.45, -0.055], s: [0.15, 0.06, 0.045] }, { p: [0, 1.36, -0.085], s: [0.07, 0.1, 0.03] }] },
-    { m: "shoulders", parts: [{ p: [0.205, 1.415, 0.005], s: [0.078, 0.078, 0.076], mirror: true }] },
-    { m: "chest", parts: [{ p: [0.078, 1.36, 0.086], s: [0.092, 0.066, 0.04], r: [0, 0, 0.12], mirror: true }] },
-    { m: "biceps", parts: [{ p: [0.235, 1.27, 0.03], s: [0.043, 0.1, 0.038], mirror: true }] },
-    { m: "triceps", parts: [{ p: [0.235, 1.28, -0.03], s: [0.045, 0.11, 0.038], mirror: true }] },
-    { m: "abs", parts: [{ p: [0.032, 1.22, 0.1], s: [0.03, 0.04, 0.02], mirror: true }, { p: [0.032, 1.13, 0.098], s: [0.03, 0.04, 0.02], mirror: true }, { p: [0.032, 1.04, 0.09], s: [0.03, 0.045, 0.02], mirror: true }] },
-    { m: "obliques", parts: [{ p: [0.125, 1.12, 0.05], s: [0.046, 0.11, 0.046], r: [0, 0, 0.12], mirror: true }] },
-    { m: "lats", parts: [{ p: [0.11, 1.25, -0.078], s: [0.078, 0.165, 0.045], r: [0, 0, -0.25], mirror: true }] },
-    { m: "lower_back", parts: [{ p: [0.03, 1.06, -0.095], s: [0.025, 0.085, 0.022], mirror: true }] },
-    { m: "glutes", parts: [{ p: [0.072, 0.93, -0.08], s: [0.086, 0.088, 0.066], mirror: true }] },
-    { m: "quads", parts: [{ p: [0.1, 0.72, 0.034], s: [0.082, 0.19, 0.062], mirror: true }] },
-    { m: "hamstrings", parts: [{ p: [0.1, 0.71, -0.034], s: [0.076, 0.18, 0.058], mirror: true }] },
-    { m: "calves", parts: [{ p: [0.11, 0.32, -0.028], s: [0.052, 0.125, 0.05], mirror: true }] },
-  ];
-  const muscles = () => MUSCLES.map(x => x.m);
+  const SRC = LIBS[0], MODEL = "/models/anatomy.glb";
+  const CREDIT = "3D-модель: BodyParts3D, © The Database Center for Life Science, CC BY 4.0";
+  const CREDIT_URL = "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html";
+  // Группы мышц модели (узлы m_<id>), id как в каталоге.
+  const MUSCLES = ["neck", "traps", "shoulders", "chest", "biceps", "triceps", "abs", "obliques", "lats", "lower_back", "glutes", "quads", "hamstrings", "calves"];
+  const muscles = () => MUSCLES.slice();
+  // Мышцы, которые видны сзади: при выборе из списка модель поворачивается к ним спиной.
+  const BACK = ["traps", "triceps", "lats", "lower_back", "glutes", "hamstrings", "calves"];
 
   function hasWebGL() {
     try {
@@ -46,106 +24,119 @@
       return !!(root.WebGLRenderingContext && (c.getContext("webgl") || c.getContext("experimental-webgl")));
     } catch (e) { return false; }
   }
+  const script = src => new Promise((ok, fail) => {
+    const s = root.document.createElement("script");
+    s.src = src; s.async = false; s.crossOrigin = "anonymous";
+    s.onload = ok; s.onerror = () => { s.remove(); fail(new Error("load " + src)); };
+    root.document.head.appendChild(s);
+  });
   let loading = null;
   function load() {
-    if (root.THREE) return Promise.resolve(root.THREE);
+    if (root.THREE && root.THREE.GLTFLoader && root.MeshoptDecoder) return Promise.resolve(root.THREE);
     if (loading) return loading;
-    loading = new Promise((ok, fail) => {
-      const s = root.document.createElement("script");
-      s.src = SRC; s.async = true; s.crossOrigin = "anonymous";
-      s.onload = () => (root.THREE ? ok(root.THREE) : fail(new Error("no THREE")));
-      s.onerror = () => { loading = null; s.remove(); fail(new Error("load")); };
-      root.document.head.appendChild(s);
-    });
+    loading = LIBS.reduce((p, src, i) => p.then(() => (i === 0 && root.THREE) || (i === 1 && root.THREE && root.THREE.GLTFLoader) || (i === 2 && root.MeshoptDecoder) ? null : script(src)), Promise.resolve())
+      .then(() => root.THREE).catch(e => { loading = null; throw e; });
     return loading;
   }
-
   const cssColor = (name, fallback) => {
     try { const v = root.getComputedStyle(root.document.documentElement).getPropertyValue(name).trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : fallback; } catch (e) { return fallback; }
   };
 
-  // el — контейнер; opts: { selected, labels: {id: название}, onPick(id) }. Возвращает Promise<{ select(id), destroy() }>.
+  // el — контейнер; opts: { selected, labels: {id: название}, onPick(id), onProgress(доля) }. Возвращает Promise<{ select, reset, destroy }>.
   async function mount(el, opts) {
     const o = opts || {};
     if (!hasWebGL()) throw new Error("webgl");
     const THREE = await load();
     if (!el.isConnected) throw new Error("gone");
+    const gltf = await new Promise((ok, fail) => {
+      const loader = new THREE.GLTFLoader();
+      loader.setMeshoptDecoder(root.MeshoptDecoder);
+      loader.load(MODEL, ok, ev => { if (o.onProgress && ev.total) o.onProgress(ev.loaded / ev.total); }, fail);
+    });
+    if (!el.isConnected) throw new Error("gone");
     const names = o.labels || {};
-    const colors = { base: cssColor("--bs3d", "#D9D2C6"), muscle: cssColor("--mz3d", "#C48A7B"), hover: cssColor("--mz-hover", "#F2B595"), on: cssColor("--accent-2", "#FF6A2B") };
+    const HL = new THREE.Color(cssColor("--accent-2", "#FF6A2B")), HOVER = new THREE.Color("#E07A5F");
 
-    const W0 = () => Math.max(240, el.clientWidth || 320), H0 = () => Math.round(Math.min(520, W0() * 1.25));
+    const W0 = () => Math.max(240, el.clientWidth || 320), H0 = () => Math.round(Math.min(560, W0() * 1.35));
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, root.devicePixelRatio || 1));
     renderer.setSize(W0(), H0());
     const canvas = renderer.domElement;
     canvas.className = "b3d-canvas";
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "3D-манекен: крути пальцем, нажми на мышцу");
+    canvas.setAttribute("aria-label", "3D-модель мышц человека: крути пальцем, приближай двумя пальцами, нажми на мышцу");
     const tag = root.document.createElement("div"); tag.className = "b3d-tag"; tag.hidden = true;
-    const hint = root.document.createElement("div"); hint.className = "b3d-hint"; hint.textContent = "Крути пальцем или мышью, нажми на мышцу";
-    el.innerHTML = ""; el.appendChild(canvas); el.appendChild(tag); el.appendChild(hint);
+    const hint = root.document.createElement("div"); hint.className = "b3d-hint"; hint.textContent = "Крути пальцем, приближай двумя пальцами, нажми на мышцу";
+    const all = root.document.createElement("button"); all.type = "button"; all.className = "b3d-all ghost tiny-btn"; all.textContent = "Всё тело"; all.hidden = true;
+    const credit = root.document.createElement("a"); credit.className = "b3d-credit"; credit.href = CREDIT_URL; credit.target = "_blank"; credit.rel = "noopener"; credit.textContent = CREDIT;
+    el.innerHTML = ""; [canvas, tag, hint, all, credit].forEach(n => el.appendChild(n));
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(28, W0() / H0(), 0.1, 20);
-    camera.position.set(0, 0.86, 4.05); camera.lookAt(0, 0.82, 0);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8070, 0.75));
-    const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(1.5, 2.5, 3); scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.35); rim.position.set(-2, 1.5, -2.5); scene.add(rim);
+    const camera = new THREE.PerspectiveCamera(30, W0() / H0(), 0.05, 20);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5a50, 0.85));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(1.2, 2.2, 2.5); scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.45); rim.position.set(-1.5, 1.6, -2.5); scene.add(rim);
 
-    const figure = new THREE.Group(); scene.add(figure);
-    const geoS = new THREE.SphereGeometry(1, 40, 28), disposables = [geoS];
-    const baseMat = new THREE.MeshStandardMaterial({ color: colors.base, roughness: 0.85, metalness: 0 });
-    disposables.push(baseMat);
-    const sides = part => (part.mirror ? [1, -1] : [1]);
-    const ellipsoid = (e, sx, mat) => {
-      const mesh = new THREE.Mesh(geoS, mat);
-      mesh.position.set(e.p[0] * sx, e.p[1], e.p[2]); mesh.scale.set(e.s[0], e.s[1], e.s[2]);
-      if (e.r) mesh.rotation.set(e.r[0], e.r[1] * sx, e.r[2] * sx);
-      return mesh;
-    };
-    PARTS.forEach(part => sides(part).forEach(sx => {
-      if (part.e) { figure.add(ellipsoid(part.e, sx, baseMat)); return; }
-      const L = part.l, a = new THREE.Vector3(L.a[0] * sx, L.a[1], L.a[2]), b = new THREE.Vector3(L.b[0] * sx, L.b[1], L.b[2]);
-      const len = a.distanceTo(b), g = new THREE.CylinderGeometry(L.rb, L.ra, len, 28, 1, false);
-      disposables.push(g);
-      const mesh = new THREE.Mesh(g, baseMat);
-      mesh.position.copy(a.clone().add(b).multiplyScalar(0.5));
-      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
-      figure.add(mesh);
-      [[a, L.ra], [b, L.rb]].forEach(([pt, r]) => { const s = new THREE.Mesh(geoS, baseMat); s.position.copy(pt); s.scale.setScalar(r); figure.add(s); });
-    }));
-
-    // Мышцы: у каждой свой материал, чтобы подсветка не задевала другие.
-    const groups = {}, meshes = [];
-    MUSCLES.forEach(mu => {
-      const mat = new THREE.MeshStandardMaterial({ color: colors.muscle, roughness: 0.6, metalness: 0 });
-      disposables.push(mat);
-      groups[mu.m] = mat;
-      mu.parts.forEach(part => sides(part).forEach(sx => {
-        const mesh = ellipsoid(part, sx, mat);
-        mesh.userData.m = mu.m;
-        figure.add(mesh); meshes.push(mesh);
-      }));
+    const figure = new THREE.Group(); figure.add(gltf.scene); scene.add(figure);
+    // Материалы: у каждой выбираемой группы свой (подсветка не задевает соседей); у всех двусторонняя отрисовка.
+    const groups = {}, meshes = [], disposables = [];
+    gltf.scene.traverse(n => {
+      if (!n.isMesh) return;
+      n.material = n.material.clone(); n.material.side = THREE.DoubleSide;
+      disposables.push(n.material, n.geometry);
+      const m = /^m_(.+)$/.exec(n.name);
+      if (m && MUSCLES.includes(m[1])) { groups[m[1]] = { mesh: n, base: n.material.color.clone() }; n.userData.m = m[1]; meshes.push(n); }
     });
+    const box = new THREE.Box3().setFromObject(gltf.scene), size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+    const home = { target: center.clone(), dist: size.y * 2.05 };
+    const view = { target: home.target.clone(), dist: home.dist };
+    let anim = null;
 
     let selected = o.selected || "", hovered = "", yaw = 0, pitch = 0, raf = 0, alive = true;
-    const paint = () => Object.keys(groups).forEach(m => groups[m].color.set(m === selected ? colors.on : m === hovered ? colors.hover : colors.muscle));
-    // Подпись над выбранной мышцей: проекция центра её деталей на экран.
+    const paint = () => Object.keys(groups).forEach(id => {
+      const g = groups[id], mat = g.mesh.material;
+      if (id === selected) { mat.color.copy(HL); mat.emissive.setRGB(0.25, 0.08, 0); }
+      else if (id === hovered) { mat.color.copy(HOVER); mat.emissive.setRGB(0.05, 0.02, 0); }
+      else { mat.color.copy(g.base); mat.emissive.setRGB(0, 0, 0); }
+    });
+    const centerOf = id => { const b = new THREE.Box3().setFromObject(groups[id].mesh); return b.getCenter(new THREE.Vector3()); };
+    // Подпись над выбранной мышцей: проекция её центра на экран.
     function placeTag() {
       if (!selected || !groups[selected]) { tag.hidden = true; return; }
-      const parts = meshes.filter(x => x.userData.m === selected);
-      const c = new THREE.Vector3();
-      parts.forEach(x => { const w = new THREE.Vector3(); x.getWorldPosition(w); c.add(w); });
-      c.multiplyScalar(1 / parts.length).project(camera);
+      const c = centerOf(selected).project(camera);
+      if (c.z > 1) { tag.hidden = true; return; }
       tag.textContent = names[selected] || selected;
       tag.style.left = ((c.x + 1) / 2 * W0()) + "px";
       tag.style.top = ((1 - c.y) / 2 * H0()) + "px";
       tag.hidden = false;
     }
-    function render() { raf = 0; if (!alive) return; figure.rotation.set(pitch, yaw, 0); paint(); renderer.render(scene, camera); placeTag(); }
-    const ask = () => { if (!raf && alive) raf = root.requestAnimationFrame(render); };
+    function render() {
+      raf = 0; if (!alive) return;
+      if (anim) {
+        const k = Math.min(1, (Date.now() - anim.t0) / 450), e = 1 - Math.pow(1 - k, 3);
+        view.target.lerpVectors(anim.from.target, anim.to.target, e); view.dist = anim.from.dist + (anim.to.dist - anim.from.dist) * e;
+        if (anim.to.yaw !== undefined) yaw = anim.from.yaw + (anim.to.yaw - anim.from.yaw) * e;
+        if (k < 1) ask(); else anim = null;
+      }
+      figure.rotation.set(pitch, yaw, 0);
+      camera.position.set(view.target.x, view.target.y, view.target.z + view.dist); camera.lookAt(view.target);
+      paint(); renderer.render(scene, camera); placeTag();
+    }
+    function ask() { if (!raf && alive) raf = root.requestAnimationFrame(render); }
+    const flyTo = to => { anim = { t0: Date.now(), from: { target: view.target.clone(), dist: view.dist, yaw }, to }; ask(); };
+    // Подлёт к мышце: учитываем текущий поворот фигуры, чтобы мышца оказалась в центре кадра.
+    function focus(id, turn) {
+      if (!id || !groups[id]) { flyTo({ target: home.target.clone(), dist: home.dist }); all.hidden = true; return; }
+      // Поворот нужной стороной (ближайший оборот), если мышцу выбрали из списка, а не нажатием на модель.
+      let toYaw;
+      if (turn) { const want = BACK.includes(id) ? Math.PI : 0; toYaw = want + Math.round((yaw - want) / (2 * Math.PI)) * 2 * Math.PI; pitch = 0; }
+      figure.rotation.set(pitch, toYaw === undefined ? yaw : toYaw, 0); figure.updateMatrixWorld(true);
+      const c = centerOf(id), b = new THREE.Box3().setFromObject(groups[id].mesh).getSize(new THREE.Vector3());
+      flyTo({ target: c, dist: Math.max(0.55, Math.min(home.dist, Math.max(b.x, b.y) * 3.2)), yaw: toYaw });
+      all.hidden = false;
+    }
 
-    // Вращение: тянем по горизонтали — поворот, по вертикали — лёгкий наклон. Короткое нажатие без сдвига — выбор мышцы.
+    // Управление: тянем — поворот и наклон, два пальца или колесо — приближение, короткое нажатие — выбор мышцы.
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
     const hit = ev => {
       const r = canvas.getBoundingClientRect();
@@ -154,48 +145,62 @@
       const h = ray.intersectObjects(meshes, false)[0];
       return h ? h.object.userData.m : "";
     };
-    let down = null;
-    const onDown = ev => { down = { x: ev.clientX, y: ev.clientY, yaw, pitch, moved: false }; if (canvas.setPointerCapture) try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* не везде */ } hint.hidden = true; };
-    const onMove = ev => {
+    const pts = new Map();
+    let down = null, pinch = null;
+    const zoom = f => { view.dist = Math.max(0.45, Math.min(home.dist * 1.2, view.dist * f)); anim = null; all.hidden = view.dist > home.dist * 0.95; ask(); };
+    canvas.addEventListener("pointerdown", ev => {
+      pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), dist: view.dist }; down = null; return; }
+      down = { x: ev.clientX, y: ev.clientY, yaw, pitch, moved: false };
+      try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* не везде */ }
+      hint.hidden = true;
+    });
+    canvas.addEventListener("pointermove", ev => {
+      if (pts.has(ev.pointerId)) pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pinch && pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); view.dist = pinch.dist; zoom(pinch.d / Math.max(20, d)); return; }
       if (down) {
         const dx = ev.clientX - down.x, dy = ev.clientY - down.y;
         if (Math.abs(dx) + Math.abs(dy) > 6) down.moved = true;
-        yaw = down.yaw + dx * 0.012; pitch = Math.max(-0.35, Math.min(0.35, down.pitch + dy * 0.004));
+        yaw = down.yaw + dx * 0.012; pitch = Math.max(-0.5, Math.min(0.5, down.pitch + dy * 0.005));
         ask(); return;
       }
       if (ev.pointerType === "mouse") { const m = hit(ev); if (m !== hovered) { hovered = m; canvas.style.cursor = m ? "pointer" : "grab"; ask(); } }
-    };
-    const onUp = ev => {
-      if (down && !down.moved) { const m = hit(ev); if (m) { selected = selected === m ? "" : m; ask(); if (o.onPick) o.onPick(selected); } }
+    });
+    const end = ev => {
+      const was = pts.has(ev.pointerId); pts.delete(ev.pointerId);
+      if (pts.size < 2) pinch = null;
+      if (ev.type === "pointerup" && was && down && !down.moved) {
+        const m = hit(ev);
+        if (m) { selected = selected === m ? "" : m; focus(selected); ask(); if (o.onPick) o.onPick(selected); }
+      }
       down = null;
     };
-    const onLeave = () => { if (hovered) { hovered = ""; ask(); } };
-    canvas.addEventListener("pointerdown", onDown);
-    canvas.addEventListener("pointermove", onMove);
-    canvas.addEventListener("pointerup", onUp);
-    canvas.addEventListener("pointercancel", () => { down = null; });
-    canvas.addEventListener("pointerleave", onLeave);
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+    canvas.addEventListener("pointerleave", () => { if (hovered) { hovered = ""; ask(); } });
+    canvas.addEventListener("wheel", ev => { ev.preventDefault(); zoom(ev.deltaY > 0 ? 1.1 : 0.9); }, { passive: false });
+    all.addEventListener("click", () => focus(""));
     const ro = root.ResizeObserver ? new root.ResizeObserver(() => { renderer.setSize(W0(), H0()); camera.aspect = W0() / H0(); camera.updateProjectionMatrix(); ask(); }) : null;
     if (ro) ro.observe(el);
-    ask();
+    if (selected) focus(selected, true); else ask();
 
     return {
-      select(m) { selected = m || ""; ask(); },
-      turn(rad) { yaw += rad; ask(); },
+      select(m) { if ((m || "") === selected) return; selected = m || ""; focus(selected, true); ask(); },
+      reset() { focus(""); },
       get selected() { return selected; },
       destroy() {
         alive = false;
         if (raf) root.cancelAnimationFrame(raf);
         if (ro) ro.disconnect();
-        disposables.forEach(d => d.dispose && d.dispose());
+        disposables.forEach(d => d && d.dispose && d.dispose());
         renderer.dispose();
         if (renderer.forceContextLoss) renderer.forceContextLoss();
-        canvas.remove(); tag.remove(); hint.remove();
+        el.innerHTML = "";
       },
     };
   }
 
-  const api = { SRC, PARTS, MUSCLES, muscles, hasWebGL, load, mount };
+  const api = { LIBS, SRC, MODEL, CREDIT, CREDIT_URL, MUSCLES, muscles, hasWebGL, load, mount };
   root.Body3D = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

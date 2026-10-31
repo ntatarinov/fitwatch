@@ -137,9 +137,10 @@
           return;
         }
         shown3d = true;
-        box.innerHTML = seg() + `<div class="b3d" id="b3d"><p class="muted b3d-msg">Загружаю 3D-манекен…</p></div>` + list3d();
+        box.innerHTML = seg() + `<div class="b3d" id="b3d"><p class="muted b3d-msg">Загружаю 3D-модель мышц…</p></div>` + list3d();
         const nav = FW.nav();
-        window.Body3D.mount(document.getElementById("b3d"), { selected: lib.muscle, labels, onPick: m => { lib.muscle = m; draw(); } })
+        const onProgress = p => { const m = document.querySelector("#b3d .b3d-msg"); if (m) m.textContent = "Загружаю 3D-модель мышц… " + Math.round(p * 100) + "%"; };
+        window.Body3D.mount(document.getElementById("b3d"), { selected: lib.muscle, labels, onProgress, onPick: m => { lib.muscle = m; draw(); } })
           .then(c => { if (FW.stale(nav) || lib.view !== "3d") { c.destroy(); return; } ctl3d = c; })
           .catch(() => {
             const el = document.getElementById("b3d");

@@ -2,7 +2,7 @@
 // Правила безопасности: запросы к /api/ и чужие адреса он не трогает вообще, ничего личного не кэширует.
 // Статика берётся сначала из сети (всегда свежая версия). Кэш — целая оболочка одной версии, записанная при установке:
 // без сети приложение открывается из неё, а не из смеси старых и новых файлов. Зависшая сеть ждёт не больше 4 секунд.
-const VERSION = "fw-0.9.4";
+const VERSION = "fw-0.9.5";
 const SHELL = [
   "/", "/index.html", "/style.css", "/manifest.webmanifest",
   "/data.js", "/catalog.js", "/machines.js", "/nutrition.js", "/planner.js", "/body.js", "/body3d.js", "/ideas.js", "/achievements.js", "/fx.js", "/engine.js", "/tree.js",

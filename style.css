@@ -451,3 +451,12 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .lib-row .rl-tx { flex:1; min-width:0; } .lib-row .pill { margin-top:6px; }
 .thumb { width:104px; height:58px; object-fit:cover; border-radius:10px; flex:none; background:var(--surface-2); }
 .thumb-none { display:flex; align-items:center; justify-content:center; color:var(--muted); }
+
+/* 3D-анатомия: тёмный фон, как в анатомических атласах; подпись авторов модели */
+.b3d { background:radial-gradient(120% 90% at 50% 30%, #3B4248, #23282C); }
+.b3d .b3d-hint { color:#C9CDD2; }
+.b3d .b3d-msg { color:#C9CDD2; }
+.b3d-all { position:absolute; top:8px; right:8px; background:rgba(255,255,255,.12); color:#fff; border:0; }
+.b3d-credit { display:block; position:absolute; left:8px; bottom:30px; right:8px; text-align:center; font-size:10px; color:#9AA1A8; text-decoration:underline; }
+.b3d-fail p { color:#C9CDD2; }
+.b3d-credit { top:10px; bottom:auto; left:10px; right:110px; text-align:left; }
