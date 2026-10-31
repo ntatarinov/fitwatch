@@ -154,6 +154,13 @@ const MIGRATIONS = [
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS history_synced_at timestamptz`,
     ],
   },
+  {
+    version: 7,
+    name: "administrators appointed in the app",
+    sql: [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

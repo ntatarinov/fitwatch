@@ -593,9 +593,10 @@
     const pro = window.Guide.isPro();
     const installCard = window.Pwa ? window.Pwa.card() : "";
     const acct = window.Account.state, isTrainer = acct.status === "user" && acct.user && acct.user.isTrainer;
-    const trainerRow = isTrainer ? linkRow("#/coach", "users", "Кабинет тренера", "Клиенты, дашборды и заметки", "Открыть")
+    const adminRow = acct.status === "user" && acct.user && acct.user.isAdmin ? linkRow("#/admin", "shield", "Панель администратора", "Пользователи и роли, заявки тренеров, промокоды", "Открыть") : "";
+    const trainerRow = adminRow + (isTrainer ? linkRow("#/coach", "users", "Кабинет тренера", "Клиенты, дашборды и заметки", "Открыть")
       : acct.status === "user" ? linkRow("#/trainers", "users", "Я тренер", "Подать заявку или посмотреть пример кабинета", "")
-      : linkRow("#/coach/demo", "users", "Я тренер", "Пример кабинета тренера. Подать заявку можно после входа", "");
+      : linkRow("#/coach/demo", "users", "Я тренер", "Пример кабинета тренера. Подать заявку можно после входа", ""));
     app.innerHTML = `<h1>Профиль</h1>
       ${PAGES.accountCard(FW)}
       ${trainerRow}

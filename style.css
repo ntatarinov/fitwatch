@@ -411,3 +411,9 @@ fieldset.grp { border:0; padding:0; margin:10px 0 0; min-width:0; } fieldset.grp
 .file-btn:focus-within, #photo:focus + .file-btn { outline:2px solid var(--accent); outline-offset:2px; }
 button.danger { background:#B42318; color:#fff; }
 code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radius:6px; overflow-wrap:anywhere; }
+
+/* ================= Роли ================= */
+.roles { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; }
+.role { font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--surface-2); color:var(--muted); }
+.role.r-admin { background:var(--text); color:var(--bg); } .role.r-trainer { background:var(--info-soft); color:var(--info); } .role.r-vip { background:var(--warn-soft); color:var(--warn); }
+.card.user .cl-act { margin-top:10px; } .vip-row select { flex:1; min-width:0; }

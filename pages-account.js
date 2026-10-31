@@ -76,10 +76,22 @@
     prepare();
   }
 
+  // Бейджи ролей: администратор, тренер, VIP-клиент (действующий платный тариф); без них — пользователь.
+  const TIER_NAME = { premium: "Премиум", personal: "Персональный тренер" };
+  P.roleBadges = function (r, esc) {
+    const out = [];
+    if (r.admin) out.push('<span class="role r-admin">Администратор</span>');
+    if (r.trainer) out.push('<span class="role r-trainer">Тренер</span>');
+    if (r.tier && r.tier !== "free") out.push('<span class="role r-vip">VIP · ' + esc(TIER_NAME[r.tier] || r.tier) + (r.until ? " до " + esc(new Date(r.until).toLocaleDateString("ru-RU")) : "") + "</span>");
+    if (!out.length) out.push('<span class="role">Пользователь</span>');
+    return '<div class="roles">' + out.join("") + "</div>";
+  };
+  const myRoles = u => ({ admin: !!u.isAdmin, trainer: !!u.isTrainer, tier: u.tier, until: u.tierUntil });
+
   P.accountCard = function (FW) {
     const s = A().state, esc = FW.esc;
     if (s.status === "user") {
-      return '<div class="card"><div class="row"><div><b>' + esc(s.user.name) + '</b><div class="muted tiny">Баллы в рейтинге: ' + s.stats.points + ' · серия ' + s.stats.streak + '</div></div><a class="pill" href="#/account">Аккаунт</a></div>' +
+      return '<div class="card"><div class="row"><div><b>' + esc(s.user.name) + '</b><div class="muted tiny">Баллы в рейтинге: ' + s.stats.points + ' · серия ' + s.stats.streak + '</div></div><a class="pill" href="#/account">Аккаунт</a></div>' + P.roleBadges(myRoles(s.user), esc) +
         '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><a class="btn" href="#/rating" data-mod="rating">Рейтинг</a><a class="btn ghost-btn" href="#/body" data-mod="progress">Мои данные</a><a class="btn ghost-btn" href="#/tariffs" data-mod="trainers">Тарифы</a>' + (s.user.isAdmin ? '<a class="btn ghost-btn" href="#/admin">Администратор</a>' : '') + '</div></div>';
     }
     if (s.status === "offline") return '<div class="card"><b>Аккаунт</b><p class="muted">Рейтинг и история веса появятся, когда подключится сервер. Приложение работает и так.</p></div>';
@@ -93,7 +105,7 @@
     if (s.status === "offline") { app.innerHTML = "<h1>Аккаунт</h1>" + offlineCard; return; }
     if (s.status === "user") {
       app.innerHTML = `<h1>Аккаунт</h1>
-        <div class="card"><div class="row"><div><b>${esc(s.user.name)}</b><div class="muted">${s.user.email ? esc(s.user.email) : "Вход через Telegram"}${s.user.telegram.linked ? " · Telegram" + (s.user.telegram.username ? " @" + esc(s.user.telegram.username) : " привязан") : ""}</div></div><button class="ghost" id="logout" type="button">Выйти</button></div>
+        <div class="card">${P.roleBadges(myRoles(s.user), esc)}<div class="row"><div><b>${esc(s.user.name)}</b><div class="muted">${s.user.email ? esc(s.user.email) : "Вход через Telegram"}${s.user.telegram.linked ? " · Telegram" + (s.user.telegram.username ? " @" + esc(s.user.telegram.username) : " привязан") : ""}</div></div><button class="ghost" id="logout" type="button">Выйти</button></div>
           <label class="chk"><input type="checkbox" id="optin" ${s.user.ratingOptIn ? "checked" : ""}> Участвовать в рейтинге: другие увидят моё имя и баллы (вес и рост не показываются)</label></div>
         ${s.user.telegram.linked ? "" : '<div class="card" id="tgbox"><b>Привязать Telegram</b><p class="muted tiny">Тогда можно входить одной кнопкой и получать сообщения от бота.</p></div>'}
         <div class="stats"><div class="card stat"><div class="big">${s.stats.points}</div><div class="muted">баллов в рейтинге</div></div><div class="card stat"><div class="big">${s.stats.streak}</div><div class="muted">серия</div></div></div>

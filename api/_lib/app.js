@@ -53,17 +53,19 @@ async function userFromCookie(db, cookies) {
   const t = cookies[S.COOKIE];
   if (!t) return null;
   const rows = await db.query(
-    `SELECT u.id, u.email, u.display_name, u.role, u.rating_opt_in, u.telegram_id, u.telegram_username, (u.password_hash IS NOT NULL) AS has_password
+    `SELECT u.id, u.email, u.display_name, u.role, u.rating_opt_in, u.telegram_id, u.telegram_username, u.is_admin, (u.password_hash IS NOT NULL) AS has_password
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now()`, [S.tokenHash(t)]);
   if (!rows.length) return null;
   const u = rows[0];
   return { id: u.id, email: u.email, name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in,
-    telegramId: u.telegram_id == null ? null : String(u.telegram_id), telegramUsername: u.telegram_username || null, hasPassword: !!u.has_password };
+    telegramId: u.telegram_id == null ? null : String(u.telegram_id), telegramUsername: u.telegram_username || null, hasPassword: !!u.has_password, isAdminDb: !!u.is_admin };
 }
 // Администратор определяется только по подтверждённой личности: Telegram ID (его подтверждает Telegram) или ID аккаунта.
 // Почта не годится: её никто не подтверждает, и чужую ещё не зарегистрированную почту мог бы занять кто угодно.
 const envList = name => String(process.env[name] || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
-const isAdmin = u => !!u && !!((u.telegramId && envList("ADMIN_TELEGRAM_IDS").includes(String(u.telegramId))) || (u.id && envList("ADMIN_USER_IDS").includes(String(u.id).toLowerCase())));
+// Первый администратор задаётся в настройках сервера; остальных он назначает в приложении (флаг is_admin в базе).
+const isEnvAdmin = u => !!u && !!((u.telegramId && envList("ADMIN_TELEGRAM_IDS").includes(String(u.telegramId))) || (u.id && envList("ADMIN_USER_IDS").includes(String(u.id).toLowerCase())));
+const isAdmin = u => !!u && (isEnvAdmin(u) || !!u.isAdminDb);
 const publicUser = u => ({ id: u.id, email: u.email || null, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u),
   telegram: u.telegramId ? { linked: true, username: u.telegramUsername } : { linked: false }, hasPassword: !!u.hasPassword });
 
@@ -168,7 +170,9 @@ async function me(ctx) {
   const st = await db.query("SELECT COALESCE(SUM(base_points + bonus_points), 0)::int AS points, count(*)::int AS workouts FROM workouts WHERE user_id = $1", [u.id]);
   const days = (await db.query("SELECT day::text AS day FROM workouts WHERE user_id = $1 ORDER BY day DESC LIMIT 60", [u.id])).map(r => V.dayNum(r.day));
   const tr = await db.query("SELECT status FROM trainer_profiles WHERE user_id = $1", [u.id]);
-  return { status: 200, body: { user: Object.assign(publicUser(u), { isTrainer: !!tr.length && tr[0].status === "approved" }), profile: profileOut(p[0]), stats: { points: Number(st[0].points), workouts: Number(st[0].workouts), streak: currentStreak(ctx.todayNum, days) } } };
+  const t = await tierOf(db, u.id);
+  // Роли человека: пользователь всегда; VIP — действующий платный тариф; тренер — подтверждённый; администратор.
+  return { status: 200, body: { user: Object.assign(publicUser(u), { isTrainer: !!tr.length && tr[0].status === "approved", tier: t.tier, tierUntil: t.until, isVip: t.tier !== "free" }), profile: profileOut(p[0]), stats: { points: Number(st[0].points), workouts: Number(st[0].workouts), streak: currentStreak(ctx.todayNum, days) } } };
 }
 route("GET", "/api/me", me);
 
@@ -299,11 +303,12 @@ route("GET", "/api/leaderboard", async ctx => {
 });
 
 // ---- тарифы и тренеры (отдельные модули, общий набор помощников) ----
-const kit = { route, HttpError, bad, needUser, V, S, tierOf, TIER_RANK, isAdmin, createSession, tooMany, noteAttempt };
+const kit = { route, HttpError, bad, needUser, V, S, tierOf, TIER_RANK, isAdmin, isEnvAdmin, createSession, tooMany, noteAttempt };
 require("./telegram").install(kit);
 require("./subscriptions").install(kit);
 require("./trainers").install(kit);
 require("./coach").install(kit);
+require("./roles").install(kit);
 
 // ---- вход в обработку ----
 async function handle(req, opts) {

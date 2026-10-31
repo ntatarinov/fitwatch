@@ -185,6 +185,7 @@
   };
 
   // ---- администратор ----
+  const adminUi = { q: "", role: "all" };
   P.admin = async function (FW) {
     const nav = FW.nav();
     if (!(await gate(FW, "Администратор")) || FW.stale(nav)) return;
@@ -192,7 +193,12 @@
     if (!acc.state.user.isAdmin) { app.innerHTML = '<h1>Администратор</h1><div class="card"><p class="muted">Нет доступа.</p></div>'; return; }
     const [tr, pr] = await Promise.all([acc.adminTrainers("pending"), acc.adminPromoList()]);
     if (FW.stale(nav)) return;
-    app.innerHTML = `<h1>Администратор</h1>
+    app.innerHTML = `<a class="back" href="#/profile">← Профиль</a><h1>Администратор</h1>
+      <h2>Пользователи и роли</h2>
+      <form id="ufind" class="card" role="search"><label for="uq"><b>Найти человека</b></label>
+        <div class="row" style="gap:8px"><input id="uq" name="q" type="search" placeholder="Имя, почта или ник Telegram" maxlength="60" style="flex:1"><button type="submit">Найти</button></div>
+        <div class="chips" id="urole" style="margin-bottom:0">${[["all", "Все"], ["admin", "Админы"], ["trainer", "Тренеры"], ["vip", "VIP"], ["user", "Пользователи"]].map(([v, l]) => `<button type="button" class="ghost ${adminUi.role === v ? "on" : ""}" data-role="${v}">${l}</button>`).join("")}</div></form>
+      <div id="ulist"><div class="card"><p class="muted">Загружаю…</p></div></div>
       <h2>Заявки тренеров (${tr.ok ? tr.data.items.length : 0})</h2>${tr.ok && tr.data.items.length ? tr.data.items.map(t => `<div class="card"><b>${esc(t.name)}</b> <span class="muted tiny">${esc(t.email || "вход через Telegram")}</span><p>${esc(t.bio)}</p><p class="muted tiny">${esc(t.specialties)}</p>
         <button data-v="approve" data-id="${t.id}" type="button">Подтвердить</button> <button class="ghost" data-v="reject" data-id="${t.id}" type="button">Отклонить</button></div>`).join("") : '<p class="muted">Нет новых заявок.</p>'}
       <h2>Промокоды</h2><form id="pform" class="card"><div class="row" style="gap:8px"><select name="tier"><option value="premium">Премиум</option><option value="personal">Персональный тренер</option></select>
@@ -200,6 +206,49 @@
         <input name="code" placeholder="Код (необязательно)" maxlength="24" style="width:100%;margin-top:8px"><div class="status" id="pmsg" role="status"></div><button type="submit">Создать код</button></form>
       ${pr.ok ? pr.data.items.map(c => `<div class="card row"><span><b>${esc(c.code)}</b> <span class="muted tiny">${TIER[c.tier]}, ${c.days} дн.</span></span><span class="muted">${c.used}/${c.maxUses}</span></div>`).join("") : ""}`;
     app.querySelectorAll("[data-v]").forEach(b => b.onclick = async () => { await acc.adminVerdict(b.dataset.id, b.dataset.v); P.admin(FW); });
+    // ---- пользователи и роли ----
+    const meId = acc.state.user.id;
+    const userCard = u => {
+      const r = u.roles, isTr = r.trainer === "approved", vip = r.tier !== "free";
+      return `<div class="card user" data-uid="${esc(u.id)}"><div class="row"><div><b>${esc(u.name)}</b>${u.id === meId ? ' <span class="muted tiny">(это ты)</span>' : ""}
+          <div class="muted tiny">${esc(u.email || "")}${u.email && u.telegram ? " · " : ""}${u.telegram ? "Telegram " + (u.telegram === "привязан" ? "привязан" : "@" + esc(u.telegram)) : ""}</div></div></div>
+        ${P.roleBadges({ admin: r.admin, trainer: isTr, tier: r.tier, until: r.tierUntil }, esc)}${r.trainer === "pending" ? '<p class="muted tiny">Заявка тренера ждёт решения (ниже).</p>' : ""}
+        <div class="cl-act">
+          ${isTr ? `<button type="button" class="ghost tiny-btn" data-act="trainer-off">Снять тренера</button>` : `<button type="button" class="tiny-btn" data-act="trainer-on">Сделать тренером</button>`}
+          ${r.admin ? (r.adminFromSettings ? '<span class="muted tiny">Администратор из настроек сервера</span>' : u.id === meId ? "" : `<button type="button" class="ghost tiny-btn" data-act="admin-off">Снять администратора</button>`) : `<button type="button" class="ghost tiny-btn" data-act="admin-on">Сделать администратором</button>`}
+        </div>
+        <div class="row vip-row" style="gap:8px;margin-top:8px"><select aria-label="VIP-тариф" data-vip-tier><option value="premium">Премиум</option><option value="personal">Персональный</option></select>
+          <input type="number" min="1" max="366" value="30" aria-label="Дней" data-vip-days style="width:80px"><button type="button" class="tiny-btn" data-act="vip">${vip ? "Продлить" : "Выдать VIP"}</button>
+          ${vip ? `<button type="button" class="ghost tiny-btn" data-act="vip-off">Снять VIP</button>` : ""}</div>
+        <div class="status" role="status"></div></div>`;
+    };
+    const drawUsers = async () => {
+      const box = document.getElementById("ulist");
+      if (!box) return;
+      const asked = adminUi.q + "|" + adminUi.role, r = await acc.adminUsers(adminUi.q, adminUi.role);
+      if (FW.stale(nav) || asked !== adminUi.q + "|" + adminUi.role || !box.isConnected) return;
+      if (!r.ok) { box.innerHTML = `<div class="card"><p class="muted">${esc(errText(r))}</p></div>`; return; }
+      box.innerHTML = r.data.items.length ? r.data.items.map(userCard).join("") : '<div class="card"><p class="muted">Никого не нашлось.</p></div>';
+    };
+    const CONFIRM = { "trainer-off": "Снять роль тренера? Его открытые связи с клиентами закроются.", "admin-off": "Снять права администратора?", "vip-off": "Снять VIP-тариф? Человек перейдёт на бесплатный." };
+    document.getElementById("ulist").onclick = async ev => {
+      const b = ev.target.closest ? ev.target.closest("button[data-act]") : null;
+      if (!b) return;
+      const card = b.closest("[data-uid]"), id = card.dataset.uid, act = b.dataset.act, st = card.querySelector(".status");
+      if (CONFIRM[act] && !window.confirm(CONFIRM[act])) return;
+      b.disabled = true;
+      const r = act === "vip" ? await acc.adminVip(id, card.querySelector("[data-vip-tier]").value, Number(card.querySelector("[data-vip-days]").value))
+        : act === "vip-off" ? await acc.adminVip(id, "none")
+        : await acc.adminRole(id, act.split("-")[0], act.endsWith("-on"));
+      if (!r.ok) { b.disabled = false; st.textContent = errText(r); return; }
+      card.outerHTML = userCard(r.data.user);
+      window.FX.toast("Готово: роли обновлены", "check");
+      if (id === meId) acc.refresh();
+    };
+    document.getElementById("ufind").onsubmit = ev => { ev.preventDefault(); adminUi.q = document.getElementById("uq").value.trim(); drawUsers(); };
+    document.getElementById("uq").value = adminUi.q;
+    app.querySelectorAll("#urole [data-role]").forEach(b => b.onclick = () => { adminUi.role = b.dataset.role; app.querySelectorAll("#urole [data-role]").forEach(x => x.classList.toggle("on", x === b)); drawUsers(); });
+    drawUsers();
     document.getElementById("pform").onsubmit = async ev => {
       ev.preventDefault();
       const f = ev.target.elements, r = await acc.adminPromoCreate({ tier: f.tier.value, days: Number(f.days.value), maxUses: Number(f.max.value), code: f.code.value.trim() || undefined });

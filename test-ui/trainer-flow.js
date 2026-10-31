@@ -219,6 +219,38 @@ async function register(w, name, email) {
   await go(trn.w, "#/chat/" + linkId);
   ok(await until(() => /только для чтения/.test(text(trn.w, "main"))) && !$(trn.w, "#mform"), "после завершения переписка только для чтения");
 
+  // ---- роли: администратор назначает в панели ----
+  await reopen(adm.w, "#/admin");
+  ok(await until(() => $$(adm.w, "#ulist .card.user").length >= 5), "панель администратора: список пользователей");
+  ok(/Администратор/.test(text(adm.w, "#ulist")) && /Тренер/.test(text(adm.w, "#ulist")) && /VIP/.test(text(adm.w, "#ulist")), "у пользователей видны роли: администратор, тренер, VIP");
+  $(adm.w, "#uq").value = "Посторонний"; submit(adm.w, $(adm.w, "#ufind"));
+  ok(await until(() => $$(adm.w, "#ulist .card.user").length === 1 && /Посторонний/.test(text(adm.w, "#ulist"))), "поиск по имени нашёл одного человека");
+  ok(/Пользователь/.test(text(adm.w, "#ulist .roles")), "у него роль «Пользователь»");
+  click(adm.w, $(adm.w, '#ulist [data-act="trainer-on"]'));
+  ok(await until(() => /Тренер/.test(text(adm.w, "#ulist .roles")) && !!$(adm.w, '#ulist [data-act="trainer-off"]')), "«Сделать тренером»: роль появилась");
+  $(adm.w, "#ulist [data-vip-tier]").value = "personal"; $(adm.w, "#ulist [data-vip-days]").value = "14";
+  click(adm.w, $(adm.w, '#ulist [data-act="vip"]'));
+  ok(await until(() => /VIP · Персональный тренер до/.test(text(adm.w, "#ulist .roles"))), "«Выдать VIP» на 14 дней");
+  click(adm.w, $(adm.w, '#ulist [data-act="admin-on"]'));
+  ok(await until(() => /Администратор/.test(text(adm.w, "#ulist .roles"))), "«Сделать администратором»");
+  await str.w.Account.refresh();
+  await reopen(str.w, "#/profile");
+  ok(await until(() => /Панель администратора/.test(text(str.w, "main")) && /Кабинет тренера/.test(text(str.w, "main"))), "человек видит в профиле панель администратора и кабинет тренера");
+  ok(/VIP · Персональный тренер/.test(text(str.w, "main .roles")) && str.w.document.getElementById("coachtab").hidden === false, "у него бейдж VIP и вкладка «Клиенты»");
+  click(adm.w, $(adm.w, '#ulist [data-act="admin-off"]'));
+  ok(await until(() => !$(adm.w, '#ulist [data-act="admin-off"]') && !!$(adm.w, '#ulist [data-act="admin-on"]')), "«Снять администратора»");
+  click(adm.w, $(adm.w, '#ulist [data-act="vip-off"]'));
+  ok(await until(() => !/VIP/.test(text(adm.w, "#ulist .roles"))), "«Снять VIP»: тариф бесплатный");
+  click(adm.w, $(adm.w, '#ulist [data-act="trainer-off"]'));
+  ok(await until(() => /Пользователь/.test(text(adm.w, "#ulist .roles"))), "«Снять тренера»: снова обычный пользователь");
+  $(adm.w, "#uq").value = ""; submit(adm.w, $(adm.w, "#ufind"));
+  click(adm.w, $$(adm.w, "#urole [data-role]").find(b => b.dataset.role === "admin"));
+  ok(await until(() => $$(adm.w, "#ulist .card.user").length >= 1 && /это ты/.test(text(adm.w, "#ulist"))), "фильтр «Админы»: в списке ты");
+  const meCard = $$(adm.w, "#ulist .card.user").find(c => /это ты/.test(c.textContent));
+  ok(!meCard.querySelector('[data-act="admin-off"]'), "снять права с самого себя нельзя: кнопки нет");
+  await go(cli.w, "#/admin");
+  ok(await until(() => /Нет доступа/.test(text(cli.w, "main"))), "обычному пользователю панель недоступна");
+
   const errs = adm.errors.concat(trn.errors, cli.errors, str.errors, cli2.errors, cli3.errors);
   ok(errs.length === 0, "ошибок скриптов нет: " + errs.slice(0, 3).join(" | "));
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);

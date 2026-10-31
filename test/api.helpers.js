@@ -26,7 +26,7 @@ function client(db, start) {
       if (method !== "GET") headers["x-fw"] = headers["x-fw"] === null ? undefined : "1";
       if (cookie()) headers.cookie = cookie();
       let q = {}; const [pathOnly, qs] = p.split("?");
-      if (qs) qs.split("&").forEach(kv => { const [k, v] = kv.split("="); q[k] = v; });
+      if (qs) qs.split("&").forEach(kv => { const [k, v] = kv.split("="); q[k] = decodeURIComponent(v === undefined ? "" : v); }); // как Vercel: параметры раскодированы
       const res = await handle({ method, path: pathOnly, query: q, body, headers }, { db, now });
       (res.cookies || []).forEach(sc => { const kv = sc.split(";")[0], i = kv.indexOf("="), k = kv.slice(0, i), v = kv.slice(i + 1); if (v === "" || /Max-Age=0\b/.test(sc)) delete jar[k]; else jar[k] = v; });
       return res;

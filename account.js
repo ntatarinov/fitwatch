@@ -19,10 +19,12 @@
     } catch (e) { return { ok: false, status: 0, error: "offline", data: null }; }
   }
 
+  // Подписчики узнают о любой смене входа, имени, участия в рейтинге и ролей (администратор, тренер, тариф).
+  const sig = s => JSON.stringify([s.status, s.user && [s.user.name, s.user.ratingOptIn, s.user.isAdmin, s.user.isTrainer, s.user.tier, s.user.tierUntil]]);
   function set(next) {
-    const changed = state.status !== next.status || (state.user && state.user.name) !== (next.user && next.user.name) || (state.user && state.user.ratingOptIn) !== (next.user && next.user.ratingOptIn);
+    const before = sig(state);
     Object.assign(state, next);
-    if (changed) notify();
+    if (sig(state) !== before) notify();
   }
   async function refresh() {
     const r = await api("GET", "/api/me");
@@ -98,6 +100,9 @@
     adminVerdict: (id, action) => api("POST", "/api/admin/trainers/" + id + "/" + action, {}),
     adminPromoCreate: v => api("POST", "/api/admin/promo", v),
     adminPromoList: () => api("GET", "/api/admin/promo"),
+    adminUsers: (q, role) => api("GET", "/api/admin/users?q=" + encodeURIComponent(q || "") + "&role=" + encodeURIComponent(role || "all")),
+    adminRole: (id, role, on) => api("POST", "/api/admin/users/" + id + "/role", { role, on }),
+    adminVip: (id, tier, days) => api("POST", "/api/admin/users/" + id + "/vip", tier === "none" ? { tier } : { tier, days }),
   };
   root.Account = A;
   if (typeof module !== "undefined" && module.exports) module.exports = A;
