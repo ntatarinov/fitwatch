@@ -172,7 +172,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   // 7c. идеи команды
   await go(w, "#/ideas");
   ok(/Идеи команды/.test(text(w, "h1")) && $$(w, ".person").length === 2, "идеи: два участника");
-  ok(/71%/.test(text(w, ".persons")) && /18%/.test(text(w, ".persons")), "идеи: проценты 71% и 18%");
+  ok(/71%/.test(text(w, ".persons")) && /23%/.test(text(w, ".persons")), "идеи: проценты 71% и 23%");
   ok($$(w, "#ideaslist .idea").length === 25 && $$(w, ".idea.st-ready").length >= 6, "идеи: 25 идей, готовые отмечены");
   click(w, $(w, '[data-st="ready"]'));
   ok($$(w, "#ideaslist .idea").length === 7 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 7");

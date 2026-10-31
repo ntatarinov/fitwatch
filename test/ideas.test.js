@@ -7,10 +7,10 @@ test("в списке 14 идей Сани и 11 идей Айдархана, и
   assert.equal(new Set(I.ITEMS.map(i => i.id)).size, I.ITEMS.length);
 });
 
-test("итоги совпадают с документом 07: Саня 7/6/1 → 71%, Айдархан 0/4/7 → 18%", () => {
+test("итоги совпадают с документом 07: Саня 7/6/1 → 71%, Айдархан 0/5/6 → 23%", () => {
   const s = I.summary(I.forWho("sanya")), a = I.summary(I.forWho("aidarkhan"));
   assert.deepEqual([s.ready, s.partial, s.notDone, s.pct, s.strictPct], [7, 6, 1, 71, 50]);
-  assert.deepEqual([a.ready, a.partial, a.notDone, a.pct, a.strictPct], [0, 4, 7, 18, 0]);
+  assert.deepEqual([a.ready, a.partial, a.notDone, a.pct, a.strictPct], [0, 5, 6, 23, 0]);
   assert.deepEqual(I.summary([]), { total: 0, ready: 0, partial: 0, planned: 0, later: 0, notDone: 0, pct: 0, strictPct: 0 });
 });
 
@@ -25,7 +25,7 @@ test("у каждой идеи заполнены название, метка �
 test("готовые и частично готовые идеи описывают, что сделано, и ведут на экран приложения", () => {
   I.ITEMS.filter(i => i.status === "ready" || i.status === "partial").forEach(i => {
     assert.ok(i.done.length > 10, i.id + ": что сделано");
-    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
+    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|body|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
   });
   I.ITEMS.filter(i => i.status === "planned" || i.status === "later").forEach(i => assert.ok(i.when.length > 3 || i.done.length > 0, i.id + ": когда"));
 });
