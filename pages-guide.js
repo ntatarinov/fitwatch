@@ -32,7 +32,9 @@
       <h3>Режим</h3>${seg("data-setmode", m, [["lite", "Lite", "Только нужное, с подсказками"], ["pro", "Pro", "Больше данных, без подсказок"]])}
       <h3>Что мне важно</h3><p class="muted tiny" style="margin:0 0 8px">Отключённое спрячется из меню и с главной. Включить обратно можно здесь же.</p>
       <div class="opt-row on locked" aria-disabled="true"><span class="oi">${ic("dumbbell", 20)}</span><span class="ot"><b>Тренировки</b><small>Всегда на месте</small></span><span class="sw" aria-hidden="true"><i></i></span></div>${rows}
-      <h3>Тема</h3>${seg("data-theme", th, [["auto", "Как в системе"], ["light", "Светлая"], ["dark", "Тёмная"]])}</div>`;
+      <h3>Тема</h3>${seg("data-theme", th, [["auto", "Как в системе"], ["light", "Светлая"], ["dark", "Тёмная"]])}
+      <h3>Приветствие</h3><button type="button" class="opt-row ${Gd.welcomeEnabled() ? "on" : ""}" data-welcome-toggle role="switch" aria-checked="${Gd.welcomeEnabled()}">
+        <span class="oi">${ic("spark", 20)}</span><span class="ot"><b>Показывать при заходе</b><small>Пока ты не вошёл в аккаунт. После входа не показывается</small></span><span class="sw" aria-hidden="true"><i></i></span></button></div>`;
   };
 
   // Карточка «нужно больше?» для режима Lite.
@@ -80,6 +82,7 @@
       if (t.dataset.setmode) { Gd.setMode(t.dataset.setmode); return; }
       if (t.dataset.modToggle) { Gd.toggleModule(t.dataset.modToggle); return; }
       if (t.dataset.theme) { Gd.setTheme(t.dataset.theme); return; }
+      if (t.hasAttribute("data-welcome-toggle")) { Gd.setWelcome(!Gd.welcomeEnabled()); return; }
       if (t.dataset.tipX) {
         Gd.dismissTip(t.dataset.tipX);
         const box = t.closest(".tip");

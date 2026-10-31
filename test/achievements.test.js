@@ -38,7 +38,7 @@ test("достижения открываются по условиям", () => 
 
 test("идентификаторы достижений уникальны, у каждого есть подсказка", () => {
   assert.equal(new Set(A.BADGES.map(b => b.id)).size, A.BADGES.length);
-  A.BADGES.forEach(b => assert.ok(b.hint.length > 5 && b.title && b.emoji));
+  A.BADGES.forEach(b => assert.ok(b.hint.length > 5 && b.title && b.icon));
 });
 
 test("неделя в точках: семь дней, сегодня последний, дни недели верные", () => {

@@ -155,3 +155,19 @@ test("приветствие передаёт выбранные разделы 
   G2.finishOnboarding("lite");
   assert.deepEqual(G2.modules(), G2.LITE_DEFAULT, "если разделы не выбирали, остаются значения по режиму");
 });
+
+test("приветствие при заходе: пока не вошёл; после входа нет; отключается в настройках", () => {
+  const s = fakeStorage(), G = fresh(s);
+  assert.equal(G.welcomeEnabled(), true);
+  assert.equal(G.shouldWelcome(false), true);
+  assert.equal(G.shouldWelcome(true), false, "вошедшему не показываем");
+  G.finishOnboarding("lite");
+  assert.equal(G.shouldWelcome(false), true, "даже после прохождения приветствие показывается, пока не вошёл");
+  const seen = []; G.onPrefs(k => seen.push(k));
+  assert.equal(G.setWelcome(false), true);
+  assert.equal(G.shouldWelcome(false), false);
+  assert.equal(fresh(s).welcomeEnabled(), false, "после перезагрузки выбор на месте");
+  G.setWelcome(true);
+  assert.equal(G.shouldWelcome(false), true);
+  assert.deepEqual(seen, ["welcome", "welcome"]);
+});

@@ -5,7 +5,7 @@ test("без звука, canvas и документа эффекты не пад
   assert.equal(FX.play("done"), false);      // нет Web Audio
   assert.equal(FX.play("нет такого"), false);
   assert.equal(FX.confetti(), false);        // нет документа
-  assert.doesNotThrow(() => { FX.toast("тест", "🎉"); FX.vibrate([10]); FX.celebrate(); });
+  assert.doesNotThrow(() => { FX.toast("тест", "check"); FX.vibrate([10]); FX.celebrate(); });
 });
 
 test("счётчик ставит конечное число, в том числе без анимации", () => {

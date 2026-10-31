@@ -77,10 +77,10 @@
     const fresh = ids.filter(id => !state.seen.includes(id)), up = L.index > (state.lvl || 1);
     if (!fresh.length && !up && L.index === state.lvl) return;
     state.seen = state.seen.concat(fresh); state.lvl = L.index; persist();
-    if (up) { X.toast("Новый уровень: " + L.title + "!", "🏆"); X.play("level"); }
+    if (up) { X.toast("Новый уровень: " + L.title + "!", "trophy"); X.play("level"); }
     fresh.forEach((id, i) => setTimeout(() => {
       const b = A.BADGES.find(x => x.id === id);
-      X.toast("Достижение: " + b.title, b.emoji);
+      X.toast("Достижение: " + b.title, b.icon);
       if (!up) X.play("badge");
     }, 700 * (i + (up ? 1 : 0))));
   }
@@ -158,7 +158,7 @@
     save();
     // Если человек вошёл в аккаунт, тренировка записывается и на сервер: оттуда очки и бонусы для рейтинга.
     window.Account.recordWorkout({ day: today(), program: p.id, dayId: d.id, title: d.title }).then(r => {
-      if (r.ok && r.data.bonus) window.FX.toast("Бонус за серию: +" + r.data.bonus + " очков", "🔥");
+      if (r.ok && r.data.bonus) window.FX.toast("Бонус за серию: +" + r.data.bonus + " очков", "flame");
       if (r.ok) window.Account.refresh();
     });
     return true;
@@ -255,12 +255,12 @@
   function weekCardHtml() {
     const goal = state.plan ? state.plan.days.length : 3, n = weekCount(), st = streak();
     const pct = Math.min(100, Math.round(n / goal * 100)), off = Math.round(264 - 264 * pct / 100);
-    const dots = window.Achievements.weekDots(workoutDates().map(dayNum), dayNum(today())).map(d => `<div class="dot ${d.done ? "done" : ""} ${d.today ? "today" : ""}"><i>${d.done ? "✓" : ""}</i>${d.label}</div>`).join("");
+    const dots = window.Achievements.weekDots(workoutDates().map(dayNum), dayNum(today())).map(d => `<div class="dot ${d.done ? "done" : ""} ${d.today ? "today" : ""}"><i>${d.done ? ic("check", 14) : ""}</i>${d.label}</div>`).join("");
     return `<div class="card"><div class="week">
         <div class="ring" role="img" aria-label="Тренировок за неделю: ${n} из ${goal}"><svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--ring-a)"/><stop offset="1" style="stop-color:var(--ring-b)"/></linearGradient></defs>
           <circle class="trk" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="val" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-dasharray="264" style="stroke-dashoffset:${off};--off:${off}"/></svg>
           <div class="num"><b>${n}/${goal}</b><small>за 7 дней</small></div></div>
-        <div style="flex:1"><div class="streak"><span class="flame ${st ? "" : "off"}">🔥</span><span class="n">${st}</span></div><div class="muted">тренировок в серии</div>
+        <div style="flex:1"><div class="streak"><span class="flame ${st ? "" : "off"}">${ic("flame", 34)}</span><span class="n">${st}</span></div><div class="muted">тренировок в серии</div>
           <div class="muted tiny" style="margin-top:6px">${weekMsg(n, goal)}</div></div></div>
       <div class="dots">${dots}</div></div>`;
   }
@@ -268,11 +268,11 @@
     const A = window.Achievements, pts = totalPoints(), L = A.levelOf(pts), nb = A.nextBadge(progressStats());
     return `<div class="card"><div class="row"><b>Уровень ${L.index} · ${esc(L.title)}</b><span class="muted">${pts} баллов</span></div>
       <div class="xp" style="margin:10px 0 6px"><i style="width:0" data-w="${L.pct}"></i></div>
-      <div class="muted tiny">${L.next ? "До уровня «" + esc(L.next) + "» осталось " + L.toNext + " баллов" : "Максимальный уровень: ты легенда!"}${nb ? " · Следующее достижение: " + nb.emoji + " " + esc(nb.title) + " (" + esc(nb.hint) + ")" : ""}</div></div>`;
+      <div class="muted tiny">${L.next ? "До уровня «" + esc(L.next) + "» осталось " + L.toNext + " баллов" : "Максимальный уровень: ты легенда!"}${nb ? " · Следующее достижение: " + esc(nb.title) + " (" + esc(nb.hint) + ")" : ""}</div></div>`;
   }
   function badgesHtml() {
     const list = window.Achievements.evaluate(progressStats()), got = list.filter(b => b.got).length;
-    return `<div class="card"><div class="row"><b>Достижения</b><span class="muted">${got} из ${list.length}</span></div><div class="badges" style="margin-top:10px">${list.map(b => `<div class="bd ${b.got ? "got" : "lock"}"><span class="em">${b.emoji}</span><b>${esc(b.title)}</b><small>${b.got ? "Открыто" : esc(b.hint)}</small></div>`).join("")}</div></div>`;
+    return `<div class="card"><div class="row"><b>Достижения</b><span class="muted">${got} из ${list.length}</span></div><div class="badges" style="margin-top:10px">${list.map(b => `<div class="bd ${b.got ? "got" : "lock"}"><span class="em">${ic(b.icon, 28)}</span><b>${esc(b.title)}</b><small>${b.got ? "Открыто" : esc(b.hint)}</small></div>`).join("")}</div></div>`;
   }
   // Шкала уровня заполняется после появления на экране, чтобы было видно движение.
   function animateBars() {
@@ -340,7 +340,7 @@
     const sleep = Gd.show("sleep") ? sleepCardHtml() : "";
     const body = Gd.show("progress") ? linkRow("#/body", "scale", "Вес и рост", "История замеров и график", "") : "";
     const proBlock = pro ? PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
-      PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : install + PAGES.proTeaser();
+      PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${ic(p.icon || "dumbbell", 30)}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : install + PAGES.proTeaser();
     app.innerHTML = head + steps + advice + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
     animateBars();
   }
@@ -358,7 +358,7 @@
     app.innerHTML = "<h1>Тренировки</h1>" + planLink + trainerCards +
       linkRow("#/library", "dumbbell", "Каталог упражнений", "По мышцам, оборудованию и уровню, с моделью тела", String(window.Catalog.EXERCISES.length)) +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
-      `<a class="card" href="#/p/${p.id}"><div class="row"><div><b>${p.icon || ""} ${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
+      `<a class="card" href="#/p/${p.id}"><div class="row"><div><b><span class="ti">${ic(p.icon || "dumbbell", 18)}</span>${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
         <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("") + (Gd.isPro() ? "" : PAGES.proTeaser());
   }
 
@@ -388,7 +388,7 @@
     app.innerHTML = `<h1>Тренер <span class="tag">по правилам, без ИИ</span></h1>
       <div class="chat">${msgs.map(m => `<div class="msg ${m.me ? "me" : ""}">${esc(m.text)}</div>`).join("")}</div>${tail}
       <div class="row" style="margin-top:12px">
-        ${trainerPath.length ? `<button class="ghost" id="tback">↩ Назад</button>` : "<span></span>"}
+        ${trainerPath.length ? `<button class="ghost" id="tback">Назад</button>` : "<span></span>"}
         ${trainerPath.length ? `<button class="ghost" id="trestart">Начать заново</button>` : ""}
       </div>`;
     app.querySelectorAll("[data-o]").forEach(b => b.onclick = () => {
@@ -407,12 +407,12 @@
       const times = state.log.filter(l => l.p === p.id && l.d === d.id).length;
       return `<a class="card" href="#/d/${p.id}/${d.id}"><div class="row"><div><b>${esc(d.title)}</b>
         <div class="muted">${d.items.map(i => esc(exOf(p, i.ex).title)).join(" · ")}</div></div>
-        <span class="pill ${times ? "done" : ""}">${times ? "✓ ×" + times : "+" + dayPoints(d)}</span></div></a>`;
+        <span class="pill ${times ? "done" : ""}">${times ? ic("check", 14) + " ×" + times : "+" + dayPoints(d)}</span></div></a>`;
     }).join("");
     const exs = p.exercises.map(e => {
       const done = state.done[k(p.id, e.id)];
       return `<a class="card" href="#/e/${p.id}/${e.id}"><div class="row"><div><b>${esc(e.title)}</b><div class="muted">${esc(e.summary)}</div></div>
-        <span class="pill ${done ? "done" : ""}">${done ? "✓ просмотрено" : "видео +" + e.points}</span></div></a>`;
+        <span class="pill ${done ? "done" : ""}">${done ? ic("check", 14) + " просмотрено" : "видео +" + e.points}</span></div></a>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/">← Все программы</a><h1>${esc(p.title)}</h1><p class="muted">${esc(p.description)}</p>
       <h2>План</h2>${days}<h2>Видео и разбор техники</h2>${exs}`;
@@ -427,7 +427,7 @@
       const watched = state.done[k(p.id, e.id)];
       return `<div class="card"><div class="row"><div><b>${n + 1}. ${esc(e.title)}</b>
         <div>${i.sets} × ${esc(i.reps)}${i.rest ? " · отдых " + i.rest + " сек" : ""}</div></div>
-        <a class="pill ${watched ? "done" : ""}" href="#/e/${p.id}/${e.id}">${watched ? "✓ видео" : "▶ видео"}</a></div></div>`;
+        <a class="pill ${watched ? "done" : ""}" href="#/e/${p.id}/${e.id}">${watched ? ic("check", 14) + " видео" : ic("play", 14) + " видео"}</a></div></div>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/p/${p.id}">← ${esc(p.title)}</a><h1>${esc(d.title)}</h1>
       <p class="muted">Разомнитесь 3–5 минут, затем выполните план. Если не знаете технику — сначала откройте видео.</p>
@@ -440,13 +440,13 @@
     const box = document.getElementById("checkin");
     const pts = dayPoints(d);
     if (justDone) {
-      box.innerHTML = `<div class="celebrate"><span class="em">🎉</span><div class="pts">+<span id="cu">0</span></div><div><b>Тренировка засчитана!</b></div>
+      box.innerHTML = `<div class="celebrate"><span class="em">${ic("trophy", 54)}</span><div class="pts">+<span id="cu">0</span></div><div><b>Тренировка засчитана!</b></div>
         <div class="muted">Серия: ${streak()} · всего ${totalPoints()} баллов. Следующая — завтра или через день: отдых тоже часть программы.</div></div>`;
       window.FX.countUp(document.getElementById("cu"), 0, pts, 900);
       return;
     }
     if (trainedToday()) {
-      box.innerHTML = `<div class="status ok">✓ Сегодняшняя тренировка уже засчитана. Следующая — завтра или через день: отдых тоже часть программы.</div>`;
+      box.innerHTML = `<div class="status ok">${ic("check", 18)} Сегодняшняя тренировка уже засчитана. Следующая — завтра или через день: отдых тоже часть программы.</div>`;
       return;
     }
     box.innerHTML = `<button id="done" class="wide">Я потренировался (+${pts})</button>
@@ -484,7 +484,7 @@
       const need = duration ? duration * window.WATCH_THRESHOLD : 0;
       const w = state.watched[key] || 0;
       bar.style.width = (state.done[key] ? 100 : need ? Math.min(100, w / need * 100) : 0) + "%";
-      if (state.done[key]) { status.textContent = "✓ Техника изучена, +" + points + " баллов в профиле"; status.className = "status ok"; }
+      if (state.done[key]) { status.textContent = "Техника изучена, +" + points + " баллов в профиле"; status.className = "status ok"; }
       else { status.textContent = "Посмотрите видео — небольшие баллы начислятся автоматически (+" + points + "). Основные баллы — за тренировку."; status.className = "status"; }
     }
     paint();
@@ -497,7 +497,7 @@
       const wasDone = !!state.done[key];
       if (state.watched[key] >= duration * window.WATCH_THRESHOLD) state.done[key] = true;
       save(); paint();
-      if (state.done[key] && !wasDone) { window.FX.toast("Техника изучена: +" + points + " баллов", "🎬"); window.FX.play("tap"); }
+      if (state.done[key] && !wasDone) { window.FX.toast("Техника изучена: +" + points + " баллов", "play"); window.FX.play("tap"); }
     }
 
     withYouTube(() => {
@@ -577,7 +577,7 @@
     on("copy", () => {
       rep.select();
       try { navigator.clipboard.writeText(rep.value); } catch (e) { document.execCommand("copy"); }
-      document.getElementById("copy").textContent = "Скопировано ✓";
+      document.getElementById("copy").textContent = "Скопировано";
     });
     on("dl", () => {
       const a = document.createElement("a");
@@ -645,6 +645,13 @@
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     if (keepScroll !== true) window.scrollTo(0, 0);
   }
+  // Ссылки «← Назад» получают значок вместо стрелки в тексте, в том числе на страницах, которые рисуются после запроса к серверу.
+  const decorateBack = () => app.querySelectorAll("a.back:not([data-d])").forEach(a => {
+    a.dataset.d = "1";
+    const t = a.firstChild;
+    if (t && t.nodeType === 3 && /^←\s*/.test(t.nodeValue)) { t.nodeValue = t.nodeValue.replace(/^←\s*/, ""); a.insertAdjacentHTML("afterbegin", ic("back", 18)); }
+  });
+  new MutationObserver(decorateBack).observe(app, { childList: true, subtree: true });
   // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
   const PAGES = window.PAGES;
   PAGES.stepsCtx = stepsCtx;
@@ -667,5 +674,9 @@
   window.Guide.apply();
   if (window.Pwa) { window.Pwa.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "guide"].includes(a)) route(); }); window.Pwa.init(); }
   route();
-  if (window.Guide.needsOnboarding()) window.Guide.showOnboarding(document, { onDone: () => route() });
+  // Приветствие при каждом заходе, пока человек не вошёл. Статус входа известен после ответа сервера; если сервер молчит, ждём недолго.
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  Promise.race([window.Account.refresh(), wait(2500)]).catch(() => {}).then(() => {
+    if (window.Guide.shouldWelcome(window.Account.state.status === "user")) window.Guide.showOnboarding(document, { onDone: () => route(true) });
+  });
 })();

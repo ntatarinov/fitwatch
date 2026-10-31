@@ -73,7 +73,7 @@
       const t = doneTimes(st, d);
       return `<a class="card" href="#/pd/${d.id}"><div class="row"><div><b>${esc(d.title)}</b>
         <div class="muted">${d.items.map(i => esc((C.byId(i.ex) || { title: i.ex }).title)).join(" · ")}</div></div>
-        <span class="pill ${t ? "done" : ""}">${t ? "✓ ×" + t : "+" + window.DAY_POINTS}</span></div></a>`;
+        <span class="pill ${t ? "done" : ""}">${t ? window.Icons.svg("check", 14) + " ×" + t : "+" + window.DAY_POINTS}</span></div></a>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Мой план</h1>${window.Guide.tip("plan")}
       ${P.ideaChips(["A6", "A28"])}
@@ -207,7 +207,7 @@
       </form>
       <h2>Сегодня</h2>
       ${items.length ? items.map(({ f, i }) => `<div class="card"><div class="row"><div><b>${esc(f.name)}</b>${f.p != null ? `<div class="muted tiny">${fmtM(f)}</div>` : `<div class="muted tiny">только калории</div>`}</div>
-        <div style="text-align:right"><b>${f.kcal}</b> ккал <button class="ghost" data-del="${i}" aria-label="Удалить">✕</button></div></div>
+        <div style="text-align:right"><b>${f.kcal}</b> ккал <button class="ghost" data-del="${i}" aria-label="Удалить">${window.Icons.svg("x", 16)}</button></div></div>
         ${f.nid ? `<div class="row" style="margin-top:6px"><label class="muted">Масса, г</label><input type="number" min="1" max="3000" value="${f.grams}" data-gi="${i}" style="width:100px"></div>` : ""}</div>`).join("") : "<p class='muted'>Пока ничего не добавлено.</p>"}`;
 
     const addEntry = (food, grams) => {
@@ -304,12 +304,12 @@
   const ideasUi = { who: "", status: "" };
   P.ideaChips = function (ids) {
     const I = window.Ideas;
-    const chips = ids.map(id => I.byId(id)).filter(Boolean).map(i => `<a class="idea-chip" href="#/ideas/${i.id}">💡 Идея ${i.who === "sanya" ? "Сани" : "Айдархана"}: ${i.chip}</a>`).join("");
+    const chips = ids.map(id => I.byId(id)).filter(Boolean).map(i => `<a class="idea-chip" href="#/ideas/${i.id}">${window.Icons.svg("bulb", 14)} Идея ${i.who === "sanya" ? "Сани" : "Айдархана"}: ${i.chip}</a>`).join("");
     return chips ? `<div class="idea-row">${chips}</div>` : "";
   };
   P.ideasCard = function () {
     const I = window.Ideas, s = I.summary(I.forWho("sanya")), a = I.summary(I.forWho("aidarkhan"));
-    return `<a class="card" href="#/ideas"><div class="row"><div><b>💡 Идеи команды</b><div class="muted tiny">Саня: ${s.pct}% · Айдархан: ${a.pct}% реализовано</div></div><span class="pill">Открыть</span></div></a>`;
+    return `<a class="card row-link" href="#/ideas"><span class="oi">${window.Icons.svg("bulb", 22)}</span><div class="rl-tx"><b>Идеи команды</b><div class="muted">Саня: ${s.pct}% · Айдархан: ${a.pct}% реализовано</div></div><span class="pill">Открыть</span></a>`;
   };
   P.ideas = function (FW, arg) {
     const I = window.Ideas, esc = FW.esc;
@@ -319,7 +319,7 @@
     const card = i => `<div class="card idea st-${ST_CLASS[i.status]} ${focus === i.id ? "hl" : ""}" id="idea-${i.id}">
       <div class="row"><div><span class="who">${esc(I.PEOPLE.find(p => p.id === i.who).name)}</span> <span class="st ${i.status}">${I.STATUS_LABEL[i.status]}</span></div><span class="muted tiny">${i.id}</span></div>
       <b>${esc(i.title)}</b>
-      ${i.done ? `<p>✅ Сделано: ${esc(i.done)}</p>` : ""}
+      ${i.done ? `<p class="doneline">${window.Icons.svg("check", 16)}<span>Сделано: ${esc(i.done)}</span></p>` : ""}
       <p class="muted">Чего не хватает: ${esc(i.missing)}${i.when ? " · " + esc(i.when) : ""}</p>
       ${i.where ? `<a class="btn" href="${i.where}">Посмотреть</a>` : ""}</div>`;
     const person = p => { const sm = I.summary(I.forWho(p.id)); return `<div class="card person"><div class="row"><b>${esc(p.name)}</b><span class="pct">${sm.pct}%</span></div>

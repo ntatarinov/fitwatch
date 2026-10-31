@@ -3,7 +3,7 @@
   "use strict";
   const P = (window.PAGES = window.PAGES || {});
   const A = () => window.Account;
-  const MEDAL = ["🥇", "🥈", "🥉"];
+  const rankMark = n => (n <= 3 ? `<span class="medal m${n}">${n}</span>` : String(n));
   const errText = r => (r.error === "offline" ? "Сервер недоступен" : r.error);
 
   const loading = FW => { FW.app.innerHTML = '<div class="card"><p class="muted">Загружаю…</p></div>'; };
@@ -18,7 +18,7 @@
     let added = 0;
     if (items.length) { const r = await acc.syncWorkouts(items); if (r.ok) added = r.data.added; }
     await acc.refresh();
-    if (added) window.FX.toast("Перенесено тренировок: " + added, "☁️");
+    if (added) window.FX.toast("Перенесено тренировок: " + added, "cloud");
   }
 
   // Кнопка Telegram (новая схема входа Telegram, OpenID): библиотека Telegram открывает окно входа и отдаёт id_token,
@@ -39,7 +39,7 @@
     if (!cfg.telegramEnabled || !cfg.telegramClientId || !box.isConnected) { if (box.parentNode) box.parentNode.removeChild(box); return; }
     const btn = document.createElement("button"), msg = document.createElement("div");
     btn.type = "button"; btn.className = "tg-btn"; btn.disabled = true;
-    btn.textContent = mode === "link" ? "✈️ Привязать Telegram" : "✈️ Войти через Telegram";
+    btn.innerHTML = window.Icons.svg("send", 20) + "<span>" + (mode === "link" ? "Привязать Telegram" : "Войти через Telegram") + "</span>";
     msg.className = "status"; msg.setAttribute("role", "alert");
     box.appendChild(btn); box.appendChild(msg);
     let nonce = null;
@@ -57,13 +57,13 @@
       const used = nonce; nonce = null; btn.disabled = true;
       window.Telegram.Login.auth({ client_id: cfg.telegramClientId, scope: ["profile", "write"], nonce: used, lang: "ru" }, async res => {
         if (!res || res.error || !res.id_token) {
-          if (res && res.error && res.error !== "popup_closed") window.FX.toast("Вход через Telegram не удался", "⚠️");
+          if (res && res.error && res.error !== "popup_closed") window.FX.toast("Вход через Telegram не удался", "alert");
           prepare(); return;
         }
         const r = await acc.telegramLogin(res.id_token);
-        if (!r.ok) { window.FX.toast(errText(r), "⚠️"); prepare(); return; }
+        if (!r.ok) { window.FX.toast(errText(r), "alert"); prepare(); return; }
         await acc.refresh();
-        if (mode === "link") { window.FX.toast("Telegram привязан", "✓"); P.account(FW); return; }
+        if (mode === "link") { window.FX.toast("Telegram привязан", "check"); P.account(FW); return; }
         await afterAuth(FW);
         FW.go("#/rating");
       });
@@ -74,7 +74,7 @@
   P.accountCard = function (FW) {
     const s = A().state, esc = FW.esc;
     if (s.status === "user") {
-      return '<div class="card"><div class="row"><div><b>👤 ' + esc(s.user.name) + '</b><div class="muted tiny">Очки в рейтинге: ' + s.stats.points + ' · серия ' + s.stats.streak + '</div></div><a class="pill" href="#/account">Аккаунт</a></div>' +
+      return '<div class="card"><div class="row"><div><b>' + esc(s.user.name) + '</b><div class="muted tiny">Очки в рейтинге: ' + s.stats.points + ' · серия ' + s.stats.streak + '</div></div><a class="pill" href="#/account">Аккаунт</a></div>' +
         '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><a class="btn" href="#/rating" data-mod="rating">Рейтинг</a><a class="btn ghost-btn" href="#/body" data-mod="progress">Мои данные</a><a class="btn ghost-btn" href="#/tariffs" data-mod="trainers">Тарифы</a>' + (s.user.isTrainer ? '<a class="btn" href="#/coach">Кабинет тренера</a>' : '') + (s.user.isAdmin ? '<a class="btn ghost-btn" href="#/admin">Администратор</a>' : '') + '</div></div>';
     }
     if (s.status === "offline") return '<div class="card"><b>Аккаунт</b><p class="muted">Рейтинг и история веса появятся, когда подключится сервер. Приложение работает и так.</p></div>';
@@ -98,13 +98,13 @@
       const tgb = document.getElementById("tgbox");
       if (tgb) mountTelegram(FW, tgb, "link");
       document.getElementById("logout").onclick = async () => { await acc.logout(); FW.go("#/"); P.account(FW); };
-      document.getElementById("optin").onchange = async ev => { const r = await acc.setRating(ev.target.checked); if (!r.ok) { ev.target.checked = !ev.target.checked; window.FX.toast(r.error || "Не удалось сохранить", "⚠️"); } else window.FX.toast(ev.target.checked ? "Вы участвуете в рейтинге" : "Вы скрыты из рейтинга", "✓"); };
+      document.getElementById("optin").onchange = async ev => { const r = await acc.setRating(ev.target.checked); if (!r.ok) { ev.target.checked = !ev.target.checked; window.FX.toast(r.error || "Не удалось сохранить", "alert"); } else window.FX.toast(ev.target.checked ? "Вы участвуете в рейтинге" : "Вы скрыты из рейтинга", "check"); };
       document.getElementById("delacc").onclick = async () => {
         const noPw = !s.user.hasPassword;
         const pw = window.prompt(noPw ? "Чтобы удалить аккаунт и все данные на сервере, напишите УДАЛИТЬ" : "Чтобы удалить аккаунт и все данные на сервере, введите пароль");
         if (!pw || (noPw && pw.trim().toUpperCase() !== "УДАЛИТЬ")) return;
         const r = await acc.deleteAccount(noPw ? "" : pw, noPw ? "DELETE" : "");
-        if (r.ok) { window.FX.toast("Аккаунт удалён", "🗑️"); FW.go("#/"); P.account(FW); } else window.FX.toast(r.error || "Не удалось удалить", "⚠️");
+        if (r.ok) { window.FX.toast("Аккаунт удалён", "trash"); FW.go("#/"); P.account(FW); } else window.FX.toast(r.error || "Не удалось удалить", "alert");
       };
       return;
     }
@@ -158,7 +158,7 @@
     if (!box) return; // ушли со страницы
     if (!r.ok) { box.innerHTML = `<div class="card"><p class="muted">${esc(r.error === "offline" ? "Сервер недоступен" : r.error)}</p></div>`; return; }
     const items = r.data.items;
-    box.innerHTML = items.length ? items.map(x => `<div class="lb-row ${x.me ? "me" : ""}"><span class="rk">${MEDAL[x.rank - 1] || x.rank}</span><span class="nm">${esc(x.name)}${x.me ? " (вы)" : ""}</span><span class="pt"><b>${x.points}</b><small>${x.workouts} трен.</small></span></div>`).join("")
+    box.innerHTML = items.length ? items.map(x => `<div class="lb-row ${x.me ? "me" : ""}"><span class="rk">${rankMark(x.rank)}</span><span class="nm">${esc(x.name)}${x.me ? " (вы)" : ""}</span><span class="pt"><b>${x.points}</b><small>${x.workouts} трен.</small></span></div>`).join("")
       : '<div class="card"><p class="muted">Пока в рейтинге никого нет за этот период. Станьте первым: включите участие и отметьте тренировку.</p></div>';
   };
 
@@ -189,7 +189,7 @@
       if (!items.length) { sum.innerHTML = `<p class="muted">Замеров пока нет. Добавь первый ниже.</p>`; hist.innerHTML = ""; return; }
       const first = items[0].value, last = items[items.length - 1].value, d = Math.round((last - first) * 10) / 10;
       sum.innerHTML = `<div class="row"><div><div class="big">${last}</div><div class="muted">${unit} сейчас</div></div><div style="text-align:right"><b>${d > 0 ? "+" : ""}${d} ${unit}</b><div class="muted tiny">с ${esc(items[0].day)}</div></div></div>` + window.Charts.line(items, unit);
-      hist.innerHTML = items.slice().reverse().slice(0, 30).map(i => `<div class="card row"><span>${esc(i.day)}</span><span><b>${i.value}</b> ${unit} <button class="ghost" data-del="${i.id}" aria-label="Удалить замер">✕</button></span></div>`).join("");
+      hist.innerHTML = items.slice().reverse().slice(0, 30).map(i => `<div class="card row"><span>${esc(i.day)}</span><span><b>${i.value}</b> ${unit} <button class="ghost" data-del="${i.id}" aria-label="Удалить замер">${window.Icons.svg("x", 16)}</button></span></div>`).join("");
       hist.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await acc.deleteMeasurement(b.dataset.del); await acc.refresh(); draw(); });
     };
     document.getElementById("bform").onsubmit = async ev => {
@@ -200,7 +200,7 @@
       if (!r.ok) { err.textContent = r.error === "offline" ? "Сервер недоступен" : r.error; return; }
       f.value.value = "";
       await acc.refresh();
-      window.FX.toast("Замер сохранён", "✓");
+      window.FX.toast("Замер сохранён", "check");
       draw();
     };
     draw();

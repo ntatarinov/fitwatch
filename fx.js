@@ -84,7 +84,7 @@
   }
 
   let toasts = null;
-  function toast(text, emoji) {
+  function toast(text, icon) {
     if (!doc) return;
     if (!toasts || !toasts.parentNode) {
       toasts = doc.createElement("div");
@@ -94,7 +94,8 @@
     while (toasts.children.length >= 3) toasts.removeChild(toasts.firstChild);
     const el = doc.createElement("div");
     el.className = "toast";
-    el.textContent = (emoji ? emoji + " " : "") + text;
+    if (icon && root.Icons && root.Icons.names.includes(icon)) { const i = doc.createElement("span"); i.className = "t-ic"; i.innerHTML = root.Icons.svg(icon, 18); el.appendChild(i); }
+    const tx = doc.createElement("span"); tx.textContent = text; el.appendChild(tx);
     toasts.appendChild(el);
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 4200);
   }

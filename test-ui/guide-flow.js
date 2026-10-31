@@ -5,9 +5,9 @@ const fs = require("fs"), path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
 const ROOT = path.join(__dirname, "..");
 
-function load(prefs) {
+function load(prefs, opts) {
   let html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-  html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + "</script>");
+  html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + (src === "account.js" && opts && opts.loggedIn ? ";Account.state.status='user';Account.state.user={name:'Тест'};Account.state.stats={points:0,streak:0};Account.refresh=async()=>{};" : "") + "</script>");
   const errors = [], vc = new VirtualConsole();
   vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0])); vc.on("error", e => errors.push(String(e)));
   const dom = new JSDOM(html, { url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc, beforeParse(w) {
@@ -30,7 +30,7 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
 (async () => {
   // 1. Первый заход: приветствие
   const { w, errors } = load(null);
-  await tick(20);
+  await tick(60);
   const ob = () => $(w, "#onboard");
   ok(!!ob() && ob().getAttribute("role") === "dialog" && ob().getAttribute("aria-modal") === "true", "приветствие открылось как диалог");
   ok(w.document.body.classList.contains("ob-lock"), "страница под окном не прокручивается");
@@ -197,20 +197,43 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   await tick(20);
   ok(prompted, "кнопка «Установить» показала системное окно браузера");
 
-  // 11. Повторный заход, пропуск приветствия, прежние настройки
-  const second = load({ mode: "pro", onboarded: true });
-  await tick(20);
-  ok(!$(second.w, "#onboard") && second.w.document.body.dataset.mode === "pro" && second.w.document.body.dataset.hide === "", "при повторном заходе приветствия нет, Pro без выбора показывает всё");
+  // 11. Приветствие при каждом заходе, пока не вошёл
+  const second = load({ mode: "pro", onboarded: true, modules: ["food", "sleep"] });
+  await tick(60);
+  ok(!!$(second.w, "#onboard"), "повторный заход без входа: приветствие снова показано");
+  ok($(second.w, "[data-skip]") !== null && second.w.document.body.dataset.mode === "pro", "под окном режим Pro на месте");
+  click(second.w, $(second.w, "[data-skip]"));
+  ok(!$(second.w, "#onboard") && ui(second.w).mode === "pro" && JSON.stringify(ui(second.w).modules) === JSON.stringify(["food", "sleep"]), "«Пропустить» при повторном показе настройки не меняет (Pro и разделы остались)");
+  const again = load({ mode: "pro", onboarded: true, modules: ["food", "sleep"] });
+  await tick(60);
+  click(again.w, $(again.w, "[data-next]")); click(again.w, $(again.w, "[data-next]")); click(again.w, $(again.w, "[data-next]"));
+  ok($(again.w, '[data-interest="food"]').getAttribute("aria-checked") === "true" && $(again.w, '[data-interest="sleep"]').getAttribute("aria-checked") === "true" && $(again.w, '[data-interest="rating"]').getAttribute("aria-checked") === "false", "в повторном приветствии отмечены текущие разделы");
+  key(again.w, "Escape");
+  ok(!$(again.w, "#onboard") && ui(again.w).mode === "pro", "Esc при повторном показе тоже ничего не меняет");
+  const off = load({ mode: "pro", onboarded: true, welcomeOff: true });
+  await tick(60);
+  ok(!$(off.w, "#onboard") && off.w.document.body.dataset.mode === "pro" && off.w.document.body.dataset.hide === "", "если приветствие отключено в настройках, окна нет; Pro без выбора показывает всё");
+  const logged = load(null, { loggedIn: true });
+  await tick(60);
+  ok(!$(logged.w, "#onboard"), "после входа в аккаунт приветствие не показывается, даже если его ещё не видели");
   const third = load(null);
-  await tick(20);
+  await tick(60);
   click(third.w, $(third.w, "[data-skip]"));
-  ok(!$(third.w, "#onboard") && ui(third.w).onboarded === true && ui(third.w).mode === "lite", "«Пропустить» закрывает окно и оставляет Lite");
+  ok(!$(third.w, "#onboard") && ui(third.w).onboarded === true && ui(third.w).mode === "lite", "«Пропустить» при первом заходе оставляет Lite");
   ok(third.w.document.body.dataset.hide === "sleep progress rating trainers", "после пропуска включено только питание: " + third.w.document.body.dataset.hide);
   const old = load({ mode: "simple", onboarded: true });
-  await tick(20);
+  await tick(60);
   ok(old.w.document.body.dataset.mode === "lite" && /Lite/.test(text(old.w, "[data-modebtn]")), "старое значение режима «simple» открывается как Lite");
+  // переключатель в настройках
+  await go(w, "#/profile");
+  ok($(w, "[data-welcome-toggle]").getAttribute("aria-checked") === "true", "в настройках переключатель приветствия включён по умолчанию");
+  click(w, $(w, "[data-welcome-toggle]")); await tick(20);
+  ok(ui(w).welcomeOff === true && $(w, "[data-welcome-toggle]").getAttribute("aria-checked") === "false", "приветствие отключено в настройках и это записано");
+  click(w, $(w, "[data-welcome-toggle]")); await tick(20);
+  ok(ui(w).welcomeOff === false, "и включено обратно");
 
-  ok(errors.length === 0 && second.errors.length === 0 && third.errors.length === 0 && old.errors.length === 0, "ошибок в консоли нет " + errors.concat(second.errors, third.errors, old.errors).join("; "));
+  const all = errors.concat(second.errors, again.errors, off.errors, logged.errors, third.errors, old.errors);
+  ok(all.length === 0, "ошибок в консоли нет " + all.join("; "));
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

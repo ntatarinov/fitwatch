@@ -37,7 +37,7 @@ function openApp(db, ip) {
   const dom = new JSDOM(html, {
     url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
-      try { w.localStorage.setItem("fitwatch.ui", JSON.stringify({ mode: "pro", onboarded: true })); } catch (e) { /* без хранилища */ } 
+      try { w.localStorage.setItem("fitwatch.ui", JSON.stringify({ mode: "pro", onboarded: true, welcomeOff: true })); } catch (e) { /* без хранилища */ } 
       w.scrollTo = () => {}; w.HTMLCanvasElement.prototype.getContext = () => null;
       w.__tgCalls = [];
       w.Telegram = { Login: { auth(opts, cb) { w.__tgCalls.push(opts); const m = w.__tgMode || "ok"; setTimeout(() => cb(m === "closed" ? { error: "popup_closed" } : m === "error" ? { error: "access_denied" } : { id_token: token(w.__tgUser, opts.nonce, m === "forged"), user: {} }), 5); } } };

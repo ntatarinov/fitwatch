@@ -3,7 +3,7 @@
 window.PROGRAMS = [
   {
     id: "start",
-    icon: "💪",
+    icon: "dumbbell",
     title: "Старт с нуля",
     description: "Три базовых упражнения без инвентаря. Подходит, если вы только начинаете.",
     days: [
@@ -74,7 +74,7 @@ window.PROGRAMS = [
   },
   {
     id: "errors",
-    icon: "🎯",
+    icon: "target",
     title: "Разбор техники",
     description: "Те же движения, но с акцентом на типичные ошибки и подводящие упражнения.",
     days: [
@@ -136,7 +136,7 @@ window.PROGRAMS = [
   },
   {
     id: "stretch",
-    icon: "🧘",
+    icon: "leaf",
     title: "Стретчинг и восстановление",
     description: "Мягкие комплексы для лёгких дней, после тренировки и при усталости. Засчитываются в серию.",
     days: [

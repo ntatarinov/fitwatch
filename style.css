@@ -337,3 +337,23 @@ body[data-hide~="rating"] [data-mod~="rating"], body[data-hide~="trainers"] [dat
 .bar-rect { fill:var(--accent-2); opacity:.45; } .bar-rect.now { opacity:1; } .bar-rect.zero { fill:var(--line); opacity:1; }
 .bar-val { fill:var(--text); font-size:10px; font-weight:700; } .bar-target { stroke:var(--ok); stroke-dasharray:4 3; stroke-width:1.5; }
 @media (max-width:380px) { .kpis { grid-template-columns:1fr; } .cl-bars { flex-direction:column; align-items:flex-start; } }
+
+/* ================= Значки вместо эмодзи ================= */
+.back { display:inline-flex; align-items:center; gap:2px; margin-left:-4px; }
+.pill svg, .st-go svg { display:inline; vertical-align:-2px; }
+.status.ok { display:flex; align-items:center; gap:8px; }
+.ti { display:inline-flex; vertical-align:-4px; margin-right:8px; color:var(--accent-text); }
+h1 .ti { vertical-align:-3px; }
+.toast { display:flex; align-items:center; gap:10px; } .toast .t-ic { display:flex; color:var(--accent-2); }
+.tg-btn { display:flex; align-items:center; justify-content:center; gap:10px; }
+.flame { color:var(--accent-2); line-height:0; } .flame.off { color:var(--muted); filter:none; opacity:.6; }
+.tile .ic { color:var(--accent-text); } .tile.t-errors .ic { color:var(--info); } .tile.t-stretch .ic { color:var(--ok); }
+.bd .em { display:flex; justify-content:center; color:var(--muted); } .bd.got .em { color:var(--accent-text); }
+.celebrate .em { display:flex; justify-content:center; color:var(--accent-text); }
+.medal { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; font-size:15px; font-weight:800; color:#14141A; }
+.medal.m1 { background:#F5C542; } .medal.m2 { background:#C9CED6; } .medal.m3 { background:#E0A070; }
+.idea-chip { display:inline-flex; align-items:center; gap:6px; }
+.doneline { display:flex; gap:8px; align-items:flex-start; } .doneline svg { color:var(--ok); margin-top:3px; }
+button.ghost svg { display:block; }
+.ios-share { display:inline-flex; vertical-align:-3px; color:var(--info); }
+.install b { display:flex; align-items:center; gap:8px; }

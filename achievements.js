@@ -22,19 +22,19 @@
 
   // s: { workouts, streak, points, checkins, foodDays, videos, hasPlan }
   const BADGES = [
-    { id: "first", emoji: "🚀", title: "Первый шаг", hint: "Отметь первую тренировку", test: s => s.workouts >= 1 },
-    { id: "streak3", emoji: "🔥", title: "Серия 3", hint: "Три тренировки подряд с короткими паузами", test: s => s.streak >= 3 },
-    { id: "streak7", emoji: "⚡", title: "Серия 7", hint: "Семь тренировок в серии", test: s => s.streak >= 7 },
-    { id: "w10", emoji: "💪", title: "10 тренировок", hint: "Десять тренировок всего", test: s => s.workouts >= 10 },
-    { id: "w25", emoji: "🏅", title: "25 тренировок", hint: "Двадцать пять тренировок всего", test: s => s.workouts >= 25 },
-    { id: "plan", emoji: "🎯", title: "Есть цель", hint: "Подбери план в анкете", test: s => !!s.hasPlan },
-    { id: "checkin5", emoji: "📝", title: "Знаю себя", hint: "Заполни пять отзывов за день", test: s => s.checkins >= 5 },
-    { id: "food3", emoji: "🍎", title: "Слежу за питанием", hint: "Записывай еду три разных дня", test: s => s.foodDays >= 3 },
-    { id: "videos5", emoji: "🎬", title: "Изучаю технику", hint: "Досмотри пять видео упражнений", test: s => s.videos >= 5 },
-    { id: "p100", emoji: "⭐", title: "100 баллов", hint: "Набери 100 баллов", test: s => s.points >= 100 },
+    { id: "first", icon: "spark", title: "Первый шаг", hint: "Отметь первую тренировку", test: s => s.workouts >= 1 },
+    { id: "streak3", icon: "flame", title: "Серия 3", hint: "Три тренировки подряд с короткими паузами", test: s => s.streak >= 3 },
+    { id: "streak7", icon: "bolt", title: "Серия 7", hint: "Семь тренировок в серии", test: s => s.streak >= 7 },
+    { id: "w10", icon: "dumbbell", title: "10 тренировок", hint: "Десять тренировок всего", test: s => s.workouts >= 10 },
+    { id: "w25", icon: "trophy", title: "25 тренировок", hint: "Двадцать пять тренировок всего", test: s => s.workouts >= 25 },
+    { id: "plan", icon: "target", title: "Есть цель", hint: "Подбери план в анкете", test: s => !!s.hasPlan },
+    { id: "checkin5", icon: "book", title: "Знаю себя", hint: "Заполни пять отзывов за день", test: s => s.checkins >= 5 },
+    { id: "food3", icon: "food", title: "Слежу за питанием", hint: "Записывай еду три разных дня", test: s => s.foodDays >= 3 },
+    { id: "videos5", icon: "play", title: "Изучаю технику", hint: "Досмотри пять видео упражнений", test: s => s.videos >= 5 },
+    { id: "p100", icon: "star", title: "100 баллов", hint: "Набери 100 баллов", test: s => s.points >= 100 },
   ];
 
-  const evaluate = s => BADGES.map(b => ({ id: b.id, emoji: b.emoji, title: b.title, hint: b.hint, got: !!b.test(s) }));
+  const evaluate = s => BADGES.map(b => ({ id: b.id, icon: b.icon, title: b.title, hint: b.hint, got: !!b.test(s) }));
   const unlockedIds = s => evaluate(s).filter(b => b.got).map(b => b.id);
 
   // Ближайшее ещё не открытое достижение — подсказка, куда двигаться дальше.

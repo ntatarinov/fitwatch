@@ -19,7 +19,7 @@
   const MODULE_IDS = MODULES.map(m => m.id);
   const LITE_DEFAULT = ["food"];
 
-  const defaults = () => ({ mode: "lite", onboarded: false, tips: {}, stepsHidden: false, installHidden: false, modules: null, theme: "auto" });
+  const defaults = () => ({ mode: "lite", onboarded: false, tips: {}, stepsHidden: false, installHidden: false, modules: null, theme: "auto", welcomeOff: false });
   const cleanModules = m => (Array.isArray(m) ? MODULE_IDS.filter(id => m.includes(id)) : null);
   function read() {
     let raw = null;
@@ -36,6 +36,7 @@
       installHidden: p.installHidden === true,
       modules: cleanModules(p.modules),
       theme: THEMES.includes(p.theme) ? p.theme : "auto",
+      welcomeOff: p.welcomeOff === true,
     };
   }
   function write(p) {
@@ -106,6 +107,16 @@
     }
     doc.querySelectorAll("[data-modebtn]").forEach(b => { b.textContent = p.mode === "pro" ? "Pro" : "Lite"; b.setAttribute("aria-label", "Режим " + (p.mode === "pro" ? "Pro" : "Lite") + ". Нажми, чтобы переключить"); });
   }
+
+  // ---------- приветствие при заходе ----------
+  // Показывается при каждом заходе, пока человек не вошёл в аккаунт. Отключить можно в настройках профиля.
+  const welcomeEnabled = () => !read().welcomeOff;
+  function setWelcome(on) {
+    patch(p => { p.welcomeOff = !on; });
+    fire(prefListeners, "welcome");
+    return true;
+  }
+  const shouldWelcome = loggedIn => !loggedIn && welcomeEnabled();
 
   // ---------- первые шаги ----------
   // ctx: { hasPlan, workouts, foodEntries, loggedIn, nextHref, useFood }. Шаг про еду пропускается, если питание отключено.
@@ -179,7 +190,8 @@
     el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "ob-title");
     doc.body.appendChild(el);
     doc.body.classList.add("ob-lock");
-    const picked = new Set(modules().length && read().onboarded ? modules() : ["food"]); // впервые: питание отмечено заранее
+    const again = read().onboarded; // повторное приветствие: стоят текущие настройки, а «Пропустить» и Esc их не меняют
+    const picked = new Set(again ? modules() : ["food"]); // впервые: питание отмечено заранее
     let i = 0, done = false, x0 = null;
     const last = () => i === SLIDES.length - 1;
     const sfx = () => { try { root.FX && root.FX.play("tap"); } catch (e) { /* звук необязателен */ } };
@@ -219,7 +231,7 @@
       if (!t) return;
       if (t.hasAttribute("data-next")) go(1);
       else if (t.hasAttribute("data-prev")) go(-1);
-      else if (t.hasAttribute("data-skip")) { sfx(); finish("lite"); }
+      else if (t.hasAttribute("data-skip")) { sfx(); finish(again ? undefined : "lite"); }
       else if (t.dataset.interest) {
         const id = t.dataset.interest, on = !picked.has(id);
         if (on) picked.add(id); else picked.delete(id);
@@ -238,7 +250,7 @@
     function onKey(ev) {
       if (ev.key === "ArrowRight") go(1);
       else if (ev.key === "ArrowLeft") go(-1);
-      else if (ev.key === "Escape") finish("lite");
+      else if (ev.key === "Escape") finish(again ? undefined : "lite");
       else if (ev.key === "Tab") { // фокус остаётся внутри окна
         const f = Array.from(el.querySelectorAll("button")).filter(b => b.textContent.trim() || b.dataset.pick || b.dataset.interest);
         if (!f.length) return;
@@ -252,7 +264,7 @@
     return { go, finish, get index() { return i; }, get slides() { return SLIDES.length; }, get picked() { return [...picked]; } };
   }
 
-  const api = { KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
+  const api = { KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, welcomeEnabled, setWelcome, shouldWelcome, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
   root.Guide = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

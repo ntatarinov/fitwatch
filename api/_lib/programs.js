@@ -3,7 +3,7 @@
 // Это черновики: перед использованием их должен проверить тренер.
 const PROGRAMS = [
   {
-    id: "mass4", icon: "💪", minTier: "premium", weeks: 8, level: "средний", place: "зал или гантели",
+    id: "mass4", icon: "dumbbell", minTier: "premium", weeks: 8, level: "средний", place: "зал или гантели",
     title: "Масса: верх и низ, 4 дня", description: "Классический сплит на 8 недель с ростом нагрузки. Нужны гантели, лучше зал.",
     phases: [
       { weeks: "1–2", sets: 3, reps: "12", rest: 60, note: "Освоение техники, вес лёгкий" },
@@ -19,7 +19,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: "strength3", icon: "🏋️", minTier: "premium", weeks: 6, level: "средний", place: "зал",
+    id: "strength3", icon: "bolt", minTier: "premium", weeks: 6, level: "средний", place: "зал",
     title: "Сила: основа, 3 дня", description: "Три тяжёлых дня в неделю на 6 недель: приседания, жимы, тяги. Нужен зал или гантели и турник.",
     phases: [
       { weeks: "1–2", sets: 4, reps: "6", rest: 120, note: "Рабочие веса, без отказа" },
@@ -34,7 +34,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: "fatburn4", icon: "🔥", minTier: "premium", weeks: 4, level: "новичок и средний", place: "дома, без инвентаря",
+    id: "fatburn4", icon: "flame", minTier: "premium", weeks: 4, level: "новичок и средний", place: "дома, без инвентаря",
     title: "Жиросжигание: интервалы, 4 недели", description: "Короткие интервальные тренировки без инвентаря. Не для тех, кому нельзя нагрузку на сердце и колени.",
     phases: [
       { weeks: "1", sets: 3, reps: "30 сек", rest: 30, note: "Знакомство" },
@@ -50,7 +50,7 @@ const PROGRAMS = [
     ],
   },
   {
-    id: "runner3", icon: "🏃", minTier: "premium", weeks: 4, level: "любой", place: "дома",
+    id: "runner3", icon: "activity", minTier: "premium", weeks: 4, level: "любой", place: "дома",
     title: "Растяжка и мобильность для бегунов, 3 дня", description: "Комплексы растяжки на каждый день: икры, бёдра, спина. Подходит для восстановления после бега.",
     phases: [
       { weeks: "1–2", sets: 2, reps: "30 сек", rest: 0, note: "Мягко, без боли" },

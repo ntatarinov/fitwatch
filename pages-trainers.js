@@ -40,7 +40,7 @@
       ev.preventDefault();
       const out = document.getElementById("perr"), rr = await acc.redeem(ev.target.elements.code.value);
       if (!rr.ok) { out.textContent = errText(rr); return; }
-      window.FX.toast("Тариф: " + TIER[rr.data.tier], "💎"); window.FX.play("level");
+      window.FX.toast("Тариф: " + TIER[rr.data.tier], "diamond"); window.FX.play("level");
       P.tariffs(FW);
     };
   };
@@ -55,7 +55,7 @@
     const { app, esc } = FW, r = await A().programs();
     if (!r.ok) { app.innerHTML = `<h1>Расширенные программы</h1><div class="card"><p class="muted">${esc(errText(r))}</p></div>`; return; }
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Расширенные программы</h1><p class="muted">Программы на 4–8 недель с ростом нагрузки. Ваш тариф: <b>${esc(TIER[r.data.tier])}</b>. Это черновики: перед использованием их стоит показать тренеру.</p>` +
-      r.data.items.map(p => `<a class="card" href="${p.locked ? "#/tariffs" : "#/pp/" + p.id}"><div class="row"><div><b>${p.icon} ${esc(p.title)}</b><div class="muted">${esc(p.description)}</div><div class="muted tiny">${p.weeks} нед. · ${p.dayCount} дн. в неделю · ${esc(p.place)}</div></div><span class="pill ${p.locked ? "" : "done"}">${p.locked ? "🔒 по подписке" : "Открыть"}</span></div></a>`).join("");
+      r.data.items.map(p => `<a class="card" href="${p.locked ? "#/tariffs" : "#/pp/" + p.id}"><div class="row"><div><b><span class="ti">${window.Icons.svg(p.icon, 18)}</span>${esc(p.title)}</b><div class="muted">${esc(p.description)}</div><div class="muted tiny">${p.weeks} нед. · ${p.dayCount} дн. в неделю · ${esc(p.place)}</div></div><span class="pill ${p.locked ? "" : "done"}">${p.locked ? window.Icons.svg("lock", 14) + " по подписке" : "Открыть"}</span></div></a>`).join("");
   };
 
   P.premiumProgram = async function (FW, id) {
@@ -65,7 +65,7 @@
     if (!p) return FW.notFound();
     if (p.locked) { app.innerHTML = `<a class="back" href="#/premium">← Программы</a><h1>${esc(p.title)}</h1><div class="card"><p>Эта программа открывается по подписке «Премиум» или выше.</p><a class="btn" href="#/tariffs">Открыть по подписке</a></div>`; return; }
     const w = weekOf[id] || 1, ph = phaseFor(p, w);
-    app.innerHTML = `<a class="back" href="#/premium">← Программы</a><h1>${p.icon} ${esc(p.title)}</h1><p class="muted">${esc(p.description)}</p>
+    app.innerHTML = `<a class="back" href="#/premium">← Программы</a><h1><span class="ti">${window.Icons.svg(p.icon, 26)}</span>${esc(p.title)}</h1><p class="muted">${esc(p.description)}</p>
       <div class="card"><label><b>Неделя программы</b></label><select id="wk">${Array.from({ length: p.weeks }, (_, i) => `<option value="${i + 1}" ${i + 1 === w ? "selected" : ""}>Неделя ${i + 1}</option>`).join("")}</select>
         <p style="margin:10px 0 0"><b>Сейчас:</b> ${ph.sets} × ${esc(ph.reps)}${ph.rest ? ", отдых " + ph.rest + " сек" : ""}. <span class="muted">${esc(ph.note)}</span></p></div>
       <h2>Фазы</h2><div class="card">${p.phases.map(x => `<div class="row"><span>Недели ${esc(x.weeks)}</span><span class="muted">${x.sets} × ${esc(x.reps)} · ${esc(x.note)}</span></div>`).join("")}</div>
@@ -110,14 +110,14 @@
     app.querySelectorAll("[data-req]").forEach(b => b.onclick = async () => {
       const note = app.querySelector(`[data-note="${b.dataset.req}"]`).value.trim(), r = await acc.requestTrainer(b.dataset.req, note);
       if (!r.ok) { document.getElementById("terr").textContent = errText(r); return; }
-      window.FX.toast("Запрос отправлен", "✉️"); P.trainers(FW);
+      window.FX.toast("Запрос отправлен", "mail"); P.trainers(FW);
     });
     const ap = document.getElementById("apply");
     if (ap) ap.onsubmit = async ev => {
       ev.preventDefault();
       const f = ev.target.elements, r = await acc.trainerApply(f.bio.value, f.spec.value);
       if (!r.ok) { document.getElementById("aerr").textContent = errText(r); return; }
-      window.FX.toast("Заявка отправлена", "✓"); P.trainers(FW);
+      window.FX.toast("Заявка отправлена", "check"); P.trainers(FW);
     };
   };
 

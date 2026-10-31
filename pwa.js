@@ -40,8 +40,8 @@
     const x = o.dismissible ? `<button type="button" class="ghost tiny-btn" data-install-x>Не сейчас</button>` : "";
     const body = s === "prompt"
       ? `<p class="muted">Открывается с экрана телефона как обычное приложение, без адресной строки, быстрее и даже без сети.</p><div class="row"><button type="button" data-install>Установить</button>${x}</div>`
-      : `<p class="muted">На iPhone: нажми «Поделиться» <span class="ios-share" aria-hidden="true">⬆️</span> в Safari, затем «На экран Домой». Значок появится рядом с остальными приложениями.</p>${x ? `<div class="row">${x}</div>` : ""}`;
-    return `<div class="card install" id="installcard"><div class="row"><b>📲 Установи как приложение</b></div>${body}</div>`;
+      : `<p class="muted">На iPhone: нажми «Поделиться» <span class="ios-share" aria-hidden="true">${root.Icons ? root.Icons.svg("share", 16) : ""}</span> в Safari, затем «На экран Домой». Значок появится рядом с остальными приложениями.</p>${x ? `<div class="row">${x}</div>` : ""}`;
+    return `<div class="card install" id="installcard"><div class="row"><b>${root.Icons ? root.Icons.svg("download", 18) : ""} Установи как приложение</b></div>${body}</div>`;
   }
 
   function init() {
