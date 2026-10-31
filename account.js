@@ -88,6 +88,9 @@
     linkAction: (id, action) => api("POST", "/api/links/" + id + "/" + action, {}),
     setShare: (id, v) => api("PATCH", "/api/links/" + id + "/share", v),
     clientView: id => api("GET", "/api/links/" + id + "/client"),
+    coachOverview: () => api("GET", "/api/coach/overview"),
+    coachClient: id => api("GET", "/api/coach/clients/" + id),
+    coachNote: (id, note) => api("PATCH", "/api/coach/clients/" + id + "/note", { note }),
     messages: (id, after) => api("GET", "/api/links/" + id + "/messages?after=" + (after || 0)),
     sendMessage: (id, body) => api("POST", "/api/links/" + id + "/messages", { body }),
     // администратор

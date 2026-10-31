@@ -5,7 +5,7 @@ const VERSION = "fw-0.7.0";
 const SHELL = [
   "/", "/index.html", "/style.css", "/manifest.webmanifest",
   "/data.js", "/catalog.js", "/nutrition.js", "/planner.js", "/body.js", "/ideas.js", "/achievements.js", "/fx.js", "/engine.js", "/tree.js",
-  "/photo.js", "/charts.js", "/icons.js", "/guide.js", "/pwa.js", "/account.js", "/pages.js", "/pages-account.js", "/pages-trainers.js", "/pages-guide.js", "/app.js",
+  "/photo.js", "/charts.js", "/icons.js", "/guide.js", "/pwa.js", "/account.js", "/pages.js", "/pages-account.js", "/pages-trainers.js", "/pages-coach.js", "/pages-guide.js", "/app.js",
   "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png", "/icons/favicon-32.png",
 ];
 

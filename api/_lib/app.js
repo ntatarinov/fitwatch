@@ -165,7 +165,8 @@ async function me(ctx) {
   const p = await db.query("SELECT * FROM profiles WHERE user_id = $1", [u.id]);
   const st = await db.query("SELECT COALESCE(SUM(base_points + bonus_points), 0)::int AS points, count(*)::int AS workouts FROM workouts WHERE user_id = $1", [u.id]);
   const days = (await db.query("SELECT day::text AS day FROM workouts WHERE user_id = $1 ORDER BY day DESC LIMIT 60", [u.id])).map(r => V.dayNum(r.day));
-  return { status: 200, body: { user: publicUser(u), profile: profileOut(p[0]), stats: { points: Number(st[0].points), workouts: Number(st[0].workouts), streak: currentStreak(ctx.todayNum, days) } } };
+  const tr = await db.query("SELECT status FROM trainer_profiles WHERE user_id = $1", [u.id]);
+  return { status: 200, body: { user: Object.assign(publicUser(u), { isTrainer: !!tr.length && tr[0].status === "approved" }), profile: profileOut(p[0]), stats: { points: Number(st[0].points), workouts: Number(st[0].workouts), streak: currentStreak(ctx.todayNum, days) } } };
 }
 route("GET", "/api/me", me);
 
@@ -292,6 +293,7 @@ const kit = { route, HttpError, bad, needUser, V, S, tierOf, TIER_RANK, isAdmin,
 require("./telegram").install(kit);
 require("./subscriptions").install(kit);
 require("./trainers").install(kit);
+require("./coach").install(kit);
 
 // ---- вход в обработку ----
 async function handle(req, opts) {

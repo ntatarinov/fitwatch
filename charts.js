@@ -24,7 +24,26 @@
     return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="График: ' + items.length + ' замеров"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".28"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
       grid + (items.length > 1 ? '<path d="' + area + '" fill="url(#cg)"/><polyline class="ch-line" fill="none" points="' + pts.join(" ") + '"/>' : "") + dots + xl + "</svg>";
   }
-  const api = { line };
+  // Столбики по неделям. items — [{label, value}] слева направо; opts.target — недельная цель (пунктирная линия), opts.small — мини-вариант без подписей.
+  function bars(items, opts) {
+    if (!items || !items.length) return "";
+    const o = opts || {}, small = !!o.small;
+    const W = small ? 120 : 320, H = small ? 34 : 140, L = small ? 0 : 22, R = small ? 0 : 6, T = small ? 2 : 16, B = small ? 0 : 24;
+    const nums = items.map(i => Math.max(0, Number(i.value) || 0));
+    const top = Math.max(1, o.target || 0, Math.max.apply(null, nums));
+    const slot = (W - L - R) / items.length, bw = Math.max(3, slot * (small ? 0.66 : 0.58));
+    const Y = v => T + (1 - v / top) * (H - T - B);
+    const rects = items.map((it, i) => {
+      const v = nums[i], x = L + slot * i + (slot - bw) / 2, y = Y(v), h = Math.max(v > 0 ? 2 : 0, H - B - y);
+      const last = i === items.length - 1;
+      return '<rect class="bar-rect' + (last ? " now" : "") + (v === 0 ? " zero" : "") + '" x="' + x.toFixed(1) + '" y="' + (H - B - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + (small ? 1.5 : 3) + '"><title>' + esc(it.label + ": " + v) + "</title></rect>" +
+        (small ? "" : (v > 0 ? '<text class="bar-val" x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - B - h - 4).toFixed(1) + '" text-anchor="middle">' + v + "</text>" : "") + '<text class="ch-lab" x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(it.label) + "</text>");
+    }).join("");
+    const target = o.target && !small ? '<line class="bar-target" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(o.target).toFixed(1) + '" y2="' + Y(o.target).toFixed(1) + '"/><text class="ch-lab" x="' + (L - 3) + '" y="' + (Y(o.target) + 3).toFixed(1) + '" text-anchor="end">' + o.target + "</text>" : "";
+    const label = o.label || ("Столбики: " + items.map((i, k) => i.label + " " + nums[k]).join(", "));
+    return '<svg class="chart bars' + (small ? " mini" : "") + '" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(label) + '">' + (small ? "" : '<line class="ch-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '"/>') + target + rects + "</svg>";
+  }
+  const api = { line, bars };
   root.Charts = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

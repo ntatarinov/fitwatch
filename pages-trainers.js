@@ -100,7 +100,7 @@
     const coach = prof && prof.status === "approved";
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Тренеры</h1>${window.Guide.tip("trainers")}${P.ideaChips(["A7", "K4"])}
       <div class="card warn"><p class="muted" style="margin:0">${DISCLAIMER}</p></div>
-      ${coach ? '<a class="btn" href="#/coach">Кабинет тренера</a>' : ""}
+      ${coach ? '<a class="btn" href="#/coach">Клиенты и дашборды</a>' : ""}
       <h2>Мои тренеры</h2>${myLinks}<h2>Выбрать тренера</h2><div class="status" id="terr" role="alert"></div>${trainers}
       <h2>Стать тренером</h2>${prof ? `<div class="card"><p>Ваша заявка: <b>${{ pending: "на проверке", approved: "подтверждена", rejected: "отклонена" }[prof.status]}</b>.</p>${prof.status === "rejected" ? "<p class='muted'>Можно исправить описание и подать снова.</p>" : ""}</div>` : ""}
       ${coach ? "" : `<form id="apply" class="card"><label><b>О себе</b></label><textarea name="bio" rows="3" maxlength="1000" placeholder="Опыт, образование, с кем работаете (от 20 символов)">${prof ? esc(prof.bio) : ""}</textarea>
@@ -119,35 +119,6 @@
       if (!r.ok) { document.getElementById("aerr").textContent = errText(r); return; }
       window.FX.toast("Заявка отправлена", "✓"); P.trainers(FW);
     };
-  };
-
-  // ---- кабинет тренера ----
-  P.coach = async function (FW) {
-    if (!(await gate(FW, "Кабинет тренера"))) return;
-    const { app, esc } = FW, acc = A();
-    const [ln, me] = await Promise.all([acc.links(), acc.trainerMe()]);
-    if (!ln.ok || !me.ok || !me.data.profile || me.data.profile.status !== "approved") { app.innerHTML = `<a class="back" href="#/trainers">← Тренеры</a><h1>Кабинет тренера</h1><div class="card"><p class="muted">Кабинет доступен подтверждённым тренерам. ${ln.ok ? "" : esc(errText(ln))}</p></div>`; return; }
-    const mine = ln.data.items.filter(l => l.role === "trainer"), by = s => mine.filter(l => l.status === s);
-    const row = (l, btns) => `<div class="card"><div class="row"><div><b>${esc(l.with.name)}</b>${l.note ? `<div class="muted tiny">«${esc(l.note)}»</div>` : ""}</div><div>${btns}</div></div></div>`;
-    app.innerHTML = `<a class="back" href="#/trainers">← Тренеры</a><h1>Кабинет тренера</h1><div class="card warn"><p class="muted" style="margin:0">${DISCLAIMER}</p></div>
-      <h2>Новые запросы (${by("requested").length})</h2>${by("requested").map(l => row(l, `<button data-act="accept" data-id="${l.id}" type="button">Принять</button> <button class="ghost" data-act="decline" data-id="${l.id}" type="button">Отклонить</button>`)).join("") || '<p class="muted">Нет новых запросов.</p>'}
-      <h2>Мои клиенты (${by("active").length})</h2>${by("active").map(l => row(l, `<a class="btn" href="#/chat/${l.id}">Чат</a> <a class="btn ghost-btn" href="#/client/${l.id}">Данные</a>`)).join("") || '<p class="muted">Пока нет активных клиентов.</p>'}
-      ${by("ended").length ? `<h2>Завершённые</h2>${by("ended").map(l => row(l, `<a class="btn ghost-btn" href="#/chat/${l.id}">Переписка</a>`)).join("")}` : ""}`;
-    app.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => { await acc.linkAction(b.dataset.id, b.dataset.act); P.coach(FW); });
-  };
-
-  P.clientView = async function (FW, id) {
-    if (!(await gate(FW, "Данные клиента"))) return;
-    const { app, esc } = FW, r = await A().clientView(id);
-    if (!r.ok) { app.innerHTML = `<a class="back" href="#/coach">← Кабинет</a><h1>Данные клиента</h1><div class="card"><p class="muted">${esc(errText(r))}</p></div>`; return; }
-    const d = r.data, C = window.Catalog, PL = window.Planner, g = d.goals;
-    const lock = what => `<div class="card"><p class="muted">🔒 Клиент не открыл доступ к ${what}.</p></div>`;
-    app.innerHTML = `<a class="back" href="#/coach">← Кабинет</a><h1>${esc(d.client.name)}</h1><p class="muted">Вы видите только то, что клиент разрешил.</p>
-      <h2>Цели и ограничения</h2>${d.shareGoals ? `<div class="card"><p>${g.goal ? esc(PL.GOALS.find(x => x.id === g.goal).label) : "Цель не указана"} · ${g.level ? esc(C.labelOf(C.LEVELS, g.level)) : "уровень не указан"}</p>
-        <p class="muted">${g.days ? g.days + " дн. по " + g.minutes + " мин · " : ""}${g.place ? esc(PL.PLACES.find(x => x.id === g.place).label) : ""}</p><p class="muted">${g.limits && g.limits.length ? "Ограничения: " + esc(g.limits.map(l => C.labelOf(C.LIMITS, l)).join(", ")) : "Ограничений не указано"}</p></div>` : lock("целям и ограничениям")}
-      <h2>Результаты</h2>${d.shareResults ? `<div class="card"><b>Тренировки</b>${d.results.workouts.length ? "<ul>" + d.results.workouts.map(w => `<li>${esc(w.day)} · ${esc(w.title || w.program)} · +${w.points}</li>`).join("") + "</ul>" : "<p class='muted'>Пока нет.</p>"}</div>
-        <div class="card"><b>Замеры</b>${d.results.measurements.length ? "<ul>" + d.results.measurements.map(m => `<li>${esc(m.day)} · ${m.kind === "weight" ? "вес" : "рост"} ${m.value}</li>`).join("") + "</ul>" : "<p class='muted'>Пока нет.</p>"}</div>` : lock("результатам")}
-      <a class="btn" href="#/chat/${id}">Открыть чат</a>`;
   };
 
   // ---- чат ----

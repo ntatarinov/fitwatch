@@ -140,6 +140,13 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS login_nonces_created ON login_nonces(created_at)`,
     ],
   },
+  {
+    version: 5,
+    name: "private trainer note about a client",
+    sql: [
+      `ALTER TABLE trainer_links ADD COLUMN IF NOT EXISTS trainer_note text CHECK (trainer_note IS NULL OR char_length(trainer_note) <= 1000)`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

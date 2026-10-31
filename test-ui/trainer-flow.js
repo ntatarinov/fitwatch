@@ -123,7 +123,7 @@ async function register(w, name, email) {
   await go(trn.w, "#/coach");
   ok(await until(() => /Новые запросы \(1\)/.test(text(trn.w, "main")) && /Хочу набрать массу/.test(text(trn.w, "main"))), "тренер видит запрос с сообщением клиента");
   click(trn.w, $(trn.w, '[data-act="accept"]'));
-  ok(await until(() => /Мои клиенты \(1\)/.test(text(trn.w, "main"))), "тренер принял запрос");
+  ok(await until(() => $$(trn.w, ".client").length === 1 && /Мои клиенты/.test(text(trn.w, "main"))), "тренер принял запрос: клиент в списке");
   const linkId = $(trn.w, 'a[href^="#/chat/"]').getAttribute("href").split("/")[2];
   await go(trn.w, "#/chat/" + linkId);
   ok(await until(() => !!$(trn.w, "#mform")), "тренер открыл чат");
@@ -140,22 +140,72 @@ async function register(w, name, email) {
 
   // ---- согласие на доступ к данным ----
   await reopen(trn.w, "#/client/" + linkId);
-  ok(await until(() => /не открыл доступ к целям/.test(text(trn.w, "main")) && /не открыл доступ к результатам/.test(text(trn.w, "main"))), "по умолчанию тренер ничего не видит");
+  ok(await until(() => /не открыл цели и ограничения/.test(text(trn.w, "main")) && /не открыл результаты/.test(text(trn.w, "main"))) && !$(trn.w, ".kpis"), "по умолчанию тренер ничего не видит");
   await go(cli.w, "#/chat/" + linkId);
   await until(() => !!$(cli.w, "#sg"));
   $(cli.w, "#sg").checked = true; change(cli.w, $(cli.w, "#sg")); await tick(150);
   await reopen(trn.w, "#/client/" + linkId);
-  ok(await until(() => /Набор массы|Набрать мышечную массу/.test(text(trn.w, "main")) && /колени/i.test(text(trn.w, "main"))) && /не открыл доступ к результатам/.test(text(trn.w, "main")), "после согласия на цели тренер видит цели и ограничения, но не результаты");
+  ok(await until(() => /Набор массы|Набрать мышечную массу/.test(text(trn.w, "main")) && /колени/i.test(text(trn.w, "main"))) && /не открыл результаты/.test(text(trn.w, "main")), "после согласия на цели тренер видит цели и ограничения, но не результаты");
   await go(cli.w, "#/chat/" + linkId);
   await until(() => !!$(cli.w, "#sr"));
   $(cli.w, "#sr").checked = true; change(cli.w, $(cli.w, "#sr")); await tick(150);
   await reopen(trn.w, "#/client/" + linkId);
-  ok(await until(() => /Тренировки/.test(text(trn.w, "main")) && /Замеры/.test(text(trn.w, "main")) && !/не открыл доступ к результатам/.test(text(trn.w, "main"))), "после согласия на результаты они видны");
+  ok(await until(() => !!$(trn.w, ".kpis") && /Последние тренировки/.test(text(trn.w, "main")) && !/не открыл результаты/.test(text(trn.w, "main"))), "после согласия на результаты виден дашборд клиента");
+  ok($$(trn.w, ".kpis .kpi").length === 4 && !!$(trn.w, "svg.bars") && /Тренировок за 7 дней/.test(text(trn.w, "main")), "в дашборде четыре показателя и график по неделям");
+  ok($$(trn.w, ".wl").length === 1 && /\+\d+/.test(text(trn.w, ".wl")), "в дашборде одна последняя тренировка клиента, записанная на сервере");
   await go(cli.w, "#/chat/" + linkId);
   await until(() => !!$(cli.w, "#sg"));
   $(cli.w, "#sg").checked = false; change(cli.w, $(cli.w, "#sg")); $(cli.w, "#sr").checked = false; change(cli.w, $(cli.w, "#sr")); await tick(150);
   await reopen(trn.w, "#/client/" + linkId);
-  ok(await until(() => /не открыл доступ к целям/.test(text(trn.w, "main")) && /не открыл доступ к результатам/.test(text(trn.w, "main"))), "согласие отозвано: данные снова закрыты");
+  ok(await until(() => /не открыл цели и ограничения/.test(text(trn.w, "main")) && /не открыл результаты/.test(text(trn.w, "main"))) && !$(trn.w, ".kpis"), "согласие отозвано: данные снова закрыты");
+
+  // ---- кабинет с несколькими клиентами ----
+  const cli2 = openApp(db, "10.5.0.5"), cli3 = openApp(db, "10.5.0.6");
+  await tick(100);
+  await register(cli2.w, "Клиент Алия", "aliya@test.kz"); await register(cli3.w, "Клиент Бек", "bek@test.kz");
+  await db.query("INSERT INTO subscriptions(user_id, tier, until) SELECT id, 'personal', now() + interval '30 days' FROM users WHERE email IN ('aliya@test.kz','bek@test.kz')");
+  const tid = (await cli2.w.Account.trainers()).data.items[0].id;
+  ok((await cli2.w.Account.requestTrainer(tid, "Нужна помощь с питанием")).ok && (await cli3.w.Account.requestTrainer(tid, "")).ok, "ещё два клиента отправили запросы тренеру");
+  await reopen(trn.w, "#/coach");
+  ok(await until(() => /Новые запросы \(2\)/.test(text(trn.w, "main")) && /Нужна помощь с питанием/.test(text(trn.w, "main"))), "тренер видит два новых запроса");
+  click(trn.w, $$(trn.w, '[data-act="accept"]')[0]);
+  await until(() => /Новые запросы \(1\)/.test(text(trn.w, "main")));
+  click(trn.w, $$(trn.w, '[data-act="accept"]')[0]);
+  ok(await until(() => $$(trn.w, ".client").length === 3 && !/Новые запросы/.test(text(trn.w, "main"))), "тренер принял обоих: в списке три клиента");
+  const aliyaLink = (await trn.w.Account.links()).data.items.find(l => l.with.name === "Клиент Алия").id;
+  await cli2.w.Account.setShare(aliyaLink, { goals: true, results: true });
+  await cli2.w.Account.saveProfile({ goal: "lose", level: 1, days: 3, minutes: 30, place: "home", limits: [] });
+  const aid = (await db.query("SELECT id FROM users WHERE email = 'aliya@test.kz'"))[0].id;
+  for (const ago of [0, 1, 3]) await db.query("INSERT INTO workouts(user_id, day, program, day_id, title, base_points, bonus_points) VALUES ($1, current_date - $2::int, 'plan', 'w1', 'Круговая', 20, 0)", [aid, ago]);
+  for (const [ago, v] of [[30, 71.2], [3, 69.8]]) await db.query("INSERT INTO measurements(user_id, kind, value, measured_on) VALUES ($1, 'weight', $2, current_date - $3::int)", [aid, v, ago]);
+  await reopen(trn.w, "#/coach");
+  ok(await until(() => $$(trn.w, ".client").length === 3 && $$(trn.w, ".kpis .kpi").length === 4), "дашборд кабинета: три клиента и четыре показателя");
+  const kv = $$(trn.w, ".kpis .kv").map(e => e.textContent);
+  ok(kv[0] === "3" && kv[1] === "1 из 1" && kv[2] === "100%", "показатели: 3 клиента, 1 из 1 тренировался, регулярность 100%: " + kv.join("|"));
+  ok(/2 клиента без доступа/.test(text(trn.w, ".kpis")), "видно, сколько клиентов не открыли результаты");
+  ok($$(trn.w, ".client .cl-bars svg.mini").length === 1 && $$(trn.w, ".client .cl-lock").length === 2, "у клиента с доступом мини-график, у остальных замок");
+  ok(!!$(trn.w, ".card svg.bars:not(.mini)") && /Тренировки клиентов по неделям/.test(text(trn.w, "main")), "общий график по неделям");
+  click(trn.w, $$(trn.w, "#cfilters [data-f]").find(b => b.dataset.f === "locked"));
+  ok(await until(() => $$(trn.w, ".client").length === 2 && !/Алия/.test(text(trn.w, "#clist"))), "фильтр «Нет доступа» оставляет двух клиентов");
+  click(trn.w, $$(trn.w, "#cfilters [data-f]").find(b => b.dataset.f === "all"));
+  await until(() => $$(trn.w, ".client").length === 3);
+  const q = $(trn.w, "#cq"); q.value = "алия"; q.dispatchEvent(new trn.w.Event("input", { bubbles: true }));
+  ok($$(trn.w, ".client").length === 1 && /Клиент Алия/.test(text(trn.w, "#clist")), "поиск по имени находит клиента");
+  q.value = ""; q.dispatchEvent(new trn.w.Event("input", { bubbles: true }));
+  await go(trn.w, "#/client/" + aliyaLink);
+  ok(await until(() => !!$(trn.w, ".kpis")) && /Круговая/.test(text(trn.w, "main")) && /69.8 кг/.test(text(trn.w, ".kpis")) && /-1.4 кг/.test(text(trn.w, ".kpis")), "дашборд клиента: тренировки, вес 69.8 и изменение -1.4 кг");
+  ok(/3 \/ 3/.test(text(trn.w, ".kpis")) && /регулярность 100%/.test(text(trn.w, ".kpis")), "3 из 3 тренировок недельной цели");
+  ok(/Набрать|Похудеть/.test(text(trn.w, "main")) && !!$(trn.w, "svg.chart"), "цели и графики на месте");
+  $(trn.w, "#tnote").value = "Начать с ходьбы, колени беречь."; click(trn.w, $(trn.w, "#nsave"));
+  ok(await until(() => /Сохранено/.test(text(trn.w, "#nstat"))), "заметка тренера сохранена");
+  await reopen(trn.w, "#/client/" + aliyaLink);
+  ok(await until(() => $(trn.w, "#tnote") && $(trn.w, "#tnote").value === "Начать с ходьбы, колени беречь."), "после перезагрузки заметка на месте");
+  await go(cli2.w, "#/chat/" + aliyaLink);
+  ok(await until(() => !!$(cli2.w, "#mform")) && !/ходьбы/.test(text(cli2.w, "main")), "клиент заметку тренера не видит");
+  await go(cli2.w, "#/coach");
+  ok(await until(() => /подтверждённым тренерам/.test(text(cli2.w, "main"))), "клиенту кабинет тренера недоступен");
+  await go(cli2.w, "#/client/" + aliyaLink);
+  ok(await until(() => /Кабинет доступен|Не найдено|подтверждённым/.test(text(cli2.w, "main"))) && !$(cli2.w, ".kpis"), "клиенту дашборд клиента недоступен");
 
   // ---- завершение ----
   await go(cli.w, "#/trainers");
@@ -165,7 +215,7 @@ async function register(w, name, email) {
   await go(trn.w, "#/chat/" + linkId);
   ok(await until(() => /только для чтения/.test(text(trn.w, "main"))) && !$(trn.w, "#mform"), "после завершения переписка только для чтения");
 
-  const errs = adm.errors.concat(trn.errors, cli.errors, str.errors);
+  const errs = adm.errors.concat(trn.errors, cli.errors, str.errors, cli2.errors, cli3.errors);
   ok(errs.length === 0, "ошибок скриптов нет: " + errs.slice(0, 3).join(" | "));
   console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
   process.exit(failed ? 1 : 0);
