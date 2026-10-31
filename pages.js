@@ -115,7 +115,8 @@
       <p class="muted" id="libcount"></p>
       <div class="card"><b>Выбери мышцу</b><p class="muted">Нажми на мышцу или на её название, и ниже останутся упражнения для неё.</p>
         <div class="body-wrap" id="bodywrap"></div>
-        <div class="row" style="margin-top:8px"><span id="musclesel" class="muted"></span><button class="ghost" id="muscleclear" type="button">Сбросить</button></div></div>
+        <div class="row" style="margin-top:8px"><span id="musclesel" class="muted"></span><button class="ghost" id="muscleclear" type="button">Сбросить</button></div>
+        <div id="musclefeel"></div></div>
       <div class="card"><div class="filters">
         <input id="libq" type="search" placeholder="Поиск по названию" value="${esc(lib.q)}" aria-label="Поиск по названию">
         ${sel("libmuscle", C.MUSCLES, lib.muscle, "Любая мышца")}${sel("libeq", C.EQUIPMENT, lib.equipment, "Любое оборудование")}
@@ -162,6 +163,9 @@
       drawBody();
       document.getElementById("musclesel").textContent = lib.muscle ? "Выбрано: " + labels[lib.muscle] : "Мышца не выбрана";
       document.getElementById("libmuscle").value = lib.muscle;
+      // Для новичка: где эта мышца и как её нащупать у себя, чтобы понять, что именно он качает.
+      const fl = lib.muscle && C.FEEL[lib.muscle];
+      document.getElementById("musclefeel").innerHTML = fl ? `<div class="feel"><b>${window.Icons.svg("target", 18)} Нащупай у себя: ${esc(labels[lib.muscle])}</b><p><span class="muted">Где она.</span> ${esc(fl.find)}</p><p><span class="muted">Как нащупать.</span> ${esc(fl.feel)}</p><p class="muted tiny">Движение лёгкое, без нагрузки. Если появилась боль, остановись.</p></div>` : "";
       document.getElementById("libcount").textContent = "Найдено упражнений: " + list.length + " из " + C.EXERCISES.length + ". Видео есть у " + C.EXERCISES.filter(e => e.video).length + ".";
       // Карточка упражнения: превью из видео (картинка), название, мышцы, оборудование, уровень.
       document.getElementById("liblist").innerHTML = list.length ? list.map(e => `<a class="card lib-row" href="#/x/${e.id}">${e.video ? `<img class="thumb" src="https://i.ytimg.com/vi/${encodeURIComponent(e.video)}/mqdefault.jpg" alt="" loading="lazy" onerror="this.remove()">` : `<span class="thumb thumb-none">${window.Icons.svg("book", 22)}</span>`}

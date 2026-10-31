@@ -86,3 +86,13 @@ test("3D-нажатие: сжатые в целые числа вершины м
   const f = { attributes: { position: { array: new Float32Array([1, 2, 3]) } }, setAttribute() { throw new Error("не трогать"); } };
   B3.dequantize({}, f);
 });
+
+test("у каждой из 14 мышц есть подсказка новичку: где она и как её нащупать, простым языком", () => {
+  const C = require("../catalog.js");
+  C.MUSCLES.forEach(m => {
+    const f = C.FEEL[m.id];
+    assert.ok(f && f.find.length > 20 && f.feel.length > 40, m.id);
+    assert.ok(!/[\u{1F300}-\u{1FAFF}]/u.test(f.find + f.feel), m.id + ": без эмодзи");
+  });
+  assert.deepEqual(Object.keys(C.FEEL).sort(), C.MUSCLES.map(m => m.id).sort());
+});

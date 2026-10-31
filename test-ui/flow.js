@@ -118,6 +118,10 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   eq.value = ""; eq.dispatchEvent(new w.Event("change", { bubbles: true }));
   await go(w, "#/library/glutes");
   ok($$(w, ".mz.on").length === 1 && /Ягодицы/.test(text(w, "#musclesel")) && $(w, '#bodywrap [data-view="back"]').classList.contains("on"), "ссылка с мышцей выбирает её и сама поворачивает фигуру спиной");
+  ok(/Нащупай у себя: Ягодицы/.test(text(w, "#musclefeel")) && /Как нащупать/.test(text(w, "#musclefeel")) && /сожми/i.test(text(w, "#musclefeel")), "у выбранной мышцы есть подсказка, как нащупать её у себя");
+  click(w, $(w, "#muscleclear"));
+  ok(!$(w, "#musclefeel .feel"), "после сброса мышцы подсказки нет");
+  await go(w, "#/library/glutes");
 
   // 5. страница упражнения
   await go(w, "#/x/lunge");

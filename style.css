@@ -487,3 +487,8 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .lg-total { position:sticky; bottom:calc(76px + env(safe-area-inset-bottom)); display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 8px; padding:10px 12px 10px 18px; border-radius:999px; background:var(--text); color:var(--bg); box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:4; }
 .lg-sum { display:flex; gap:14px; flex-wrap:wrap; font-size:14px; } .lg-sum b { font-size:18px; }
 .lg-lines { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+
+/* Нащупай мышцу у себя */
+.feel { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft, rgba(255, 106, 43, .10)); }
+.feel b { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.feel p { margin: 6px 0 0; }
