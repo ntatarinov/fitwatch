@@ -213,3 +213,25 @@ dbtest("маршруты: неизвестный адрес, неверный м
   assert.equal(r.status, 503);
   if (saved.a) process.env.DATABASE_URL = saved.a; if (saved.b) process.env.POSTGRES_URL = saved.b;
 });
+
+test("точка входа Vercel: путь собирается из __p, лишний параметр не попадает в запрос", () => {
+  const entry = require("../api/index.js");
+  assert.deepEqual(entry.pathOf({ url: "/api/index?__p=auth%2Fregister", query: { __p: "auth/register" } }), { path: "/api/auth/register", query: {} });
+  assert.deepEqual(entry.pathOf({ url: "/x", query: { __p: ["workouts", "sync"], period: "week" } }), { path: "/api/workouts/sync", query: { period: "week" } });
+  assert.deepEqual(entry.pathOf({ url: "/api/leaderboard?period=all", query: {} }).path, "/api/leaderboard"); // без перенаправления
+  assert.equal(entry.pathOf({ url: "/api/", query: { __p: "" } }).path, "/api/");
+});
+
+dbtest("точка входа Vercel обрабатывает вложенный адрес и отдаёт cookie", async () => {
+  const { setDb } = require("../api/_lib/db");
+  setDb(db);
+  const entry = require("../api/index.js");
+  const sent = {};
+  const res = { setHeader: (k, v) => { sent[k] = v; }, status(c) { sent.status = c; return this; }, json(b) { sent.body = b; } };
+  await entry({ method: "POST", url: "/api/index?__p=auth%2Fregister", query: { __p: "auth/register" }, headers: { host: "x.test", "x-fw": "1", "x-forwarded-for": "5.5.5.5" },
+    body: { email: "entry@test.kz", password: "password-entry", name: "Вход" } }, res);
+  assert.equal(sent.status, 201);
+  assert.match(String(sent["Set-Cookie"]), /fw_session=/);
+  assert.equal(sent["Cache-Control"], "no-store");
+  setDb(null);
+});
