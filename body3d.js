@@ -16,7 +16,35 @@
   const MUSCLES = ["neck", "traps", "shoulders", "chest", "biceps", "triceps", "abs", "obliques", "lats", "lower_back", "glutes", "quads", "hamstrings", "calves"];
   const muscles = () => MUSCLES.slice();
   // Мышцы, которые видны сзади: при выборе из списка модель поворачивается к ним спиной.
+  // Мышцы, видимые только с одной стороны: с другой они лежат за телом и нажатием не выбираются.
+  const FRONT_ONLY = ["chest", "abs", "biceps", "quads"], BACK_ONLY = ["traps", "triceps", "lats", "lower_back", "glutes", "hamstrings"];
   const BACK = ["traps", "triceps", "lats", "lower_back", "glutes", "hamstrings", "calves"];
+
+  // Выбор мышцы из попаданий луча (по возрастанию расстояния): hits — [{ m, distance }], side — 1 грудью к камере, -1 спиной, 0 боком,
+  // depth — на сколько глубже первого допустимого попадания ещё смотрим, score(hit) — чем меньше, тем лучше (расстояние до центра мышцы).
+  function choose(hits, side, depth, score) {
+    let first = -1, best = "", bestScore = Infinity;
+    for (let i = 0; i < hits.length; i++) {
+      const m = hits[i].m;
+      if ((side > 0 && BACK_ONLY.includes(m)) || (side < 0 && FRONT_ONLY.includes(m))) continue;
+      if (first < 0) first = hits[i].distance;
+      if (hits[i].distance - first > depth) break;
+      const sc = score(hits[i]);
+      if (sc < bestScore) { bestScore = sc; best = m; }
+    }
+    return best;
+  }
+  // Модель сжата в целые числа (KHR_mesh_quantization), а луч нажатия в three r128 читает их «как есть»: попадания были случайными.
+  // Положения вершин переводятся в обычные дробные числа; узел модели сам возвращает масштаб.
+  function dequantize(THREE, geometry) {
+    const pos = geometry.attributes.position;
+    if (!pos || pos.array instanceof Float32Array) return;
+    const k = pos.normalized ? (pos.array instanceof Int16Array ? 32767 : pos.array instanceof Int8Array ? 127 : pos.array instanceof Uint16Array ? 65535 : 255) : 1;
+    const f = new Float32Array(pos.array.length);
+    for (let i = 0; i < f.length; i++) f[i] = Math.max(-1, pos.array[i] / k);
+    geometry.setAttribute("position", new THREE.BufferAttribute(f, 3));
+    geometry.computeBoundingSphere(); geometry.computeBoundingBox();
+  }
 
   function hasWebGL() {
     try {
@@ -83,6 +111,7 @@
     gltf.scene.traverse(n => {
       if (!n.isMesh) return;
       n.material = n.material.clone(); n.material.side = THREE.DoubleSide;
+      dequantize(THREE, n.geometry);
       disposables.push(n.material, n.geometry);
       const m = /^m_(.+)$/.exec(n.name);
       if (m && MUSCLES.includes(m[1])) { groups[m[1]] = { mesh: n, base: n.material.color.clone() }; n.userData.m = m[1]; meshes.push(n); }
@@ -138,13 +167,22 @@
 
     // Управление: тянем — поворот и наклон, два пальца или колесо — приближение, короткое нажатие — выбор мышцы.
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+    // Что нажато. Слои мышц в модели лежат вплотную, поэтому «ближайшая поверхность» выбирала случайную мышцу, а луч через тело
+    // доставал мышцы с другой стороны. Правила: со стороны груди не выбираются мышцы спины и наоборот (как в «Спереди / Сзади»);
+    // из мышц, лежащих у поверхности на одной глубине, берётся та, чей центр ближе к точке нажатия.
+    const centers = {};
+    meshes.forEach(m => { centers[m.userData.m] = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()); });
+    const point = new THREE.Vector3(), depth = size.y * 0.035;
     const hit = ev => {
       const r = canvas.getBoundingClientRect();
       ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+      camera.updateMatrixWorld(true); figure.updateMatrixWorld(true);
       ray.setFromCamera(ndc, camera);
-      const h = ray.intersectObjects(meshes, false)[0];
-      return h ? h.object.userData.m : "";
+      const side = Math.cos(yaw) > 0.35 ? 1 : Math.cos(yaw) < -0.35 ? -1 : 0;
+      const hs = ray.intersectObjects(meshes, false).map(h => ({ m: h.object.userData.m, distance: h.distance, point: h.point }));
+      return choose(hs, side, depth, h => figure.worldToLocal(point.copy(h.point)).distanceTo(centers[h.m]));
     };
+
     const pts = new Map();
     let down = null, pinch = null;
     const zoom = f => { view.dist = Math.max(0.45, Math.min(home.dist * 1.2, view.dist * f)); anim = null; all.hidden = view.dist > home.dist * 0.95; ask(); };
@@ -188,6 +226,7 @@
       select(m) { if ((m || "") === selected) return; selected = m || ""; focus(selected, true); ask(); },
       reset() { focus(""); },
       get selected() { return selected; },
+      pickAt: (x, y) => hit({ clientX: x, clientY: y }),
       destroy() {
         alive = false;
         if (raf) root.cancelAnimationFrame(raf);
@@ -200,7 +239,7 @@
     };
   }
 
-  const api = { LIBS, SRC, MODEL, CREDIT, CREDIT_URL, MUSCLES, muscles, hasWebGL, load, mount };
+  const api = { choose, dequantize, FRONT_ONLY, BACK_ONLY, LIBS, SRC, MODEL, CREDIT, CREDIT_URL, MUSCLES, muscles, hasWebGL, load, mount };
   root.Body3D = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

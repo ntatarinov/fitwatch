@@ -380,7 +380,10 @@
       <div id="ideaslist"></div>
       <h2>Основа платформы из переписки</h2>
       <p class="muted tiny">Это не 11 идей Айдархана, а то, на чём они держатся: база, библиотека, программы, тренер, данные и подписка (его список «что должно быть в базе» из переписки 31.10). В проценты выше не входит. Если такая же идея есть у Сани, статус у них одинаковый.</p>
-      ${I.FOUNDATION.map(card).join("")}`;
+      ${I.FOUNDATION.map(card).join("")}
+      <h2>Добавлено позже</h2>
+      <p class="muted tiny">Идеи, которые появились после первых списков. В проценты выше не входят.</p>
+      ${I.ADDED.map(card).join("")}`;
     const draw = () => {
       const list = I.ITEMS.filter(i => (!ideasUi.who || i.who === ideasUi.who) && (!ideasUi.status || i.status === ideasUi.status));
       document.getElementById("ideaslist").innerHTML = list.length ? list.map(card).join("") : "<div class='card'><p class='muted'>Нет идей с такими условиями.</p></div>";

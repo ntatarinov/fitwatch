@@ -62,3 +62,13 @@ test("в файле ideas.js нет прежнего названия блока
   const src = require("fs").readFileSync(require("path").join(__dirname, "..", "ideas.js"), "utf8");
   assert.ok(!/PRIORITIES/.test(src));
 });
+
+test("идеи, добавленные позже: статистика тренировок — идея Айдархана, в проценты двух списков не входит; 3D-модель — идея Сани", () => {
+  assert.deepEqual(I.ADDED.map(i => [i.id, i.who, i.status]), [["N1", "aidarkhan", "ready"]]);
+  assert.equal(I.summary(I.forWho("aidarkhan")).total, 11);
+  assert.ok(!I.ITEMS.some(i => i.id === "N1"));
+  assert.equal(I.byId("N1").where, "#/stats");
+  const a2 = I.byId("A2");
+  assert.equal(a2.who, "sanya");
+  assert.match(a2.done, /3D/);
+});

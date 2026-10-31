@@ -61,3 +61,28 @@ test("3D-анатомия: модель на месте, в ней все 14 г�
   B3.LIBS.forEach(u => assert.match(u, /^https:\/\/(cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r128\/|cdn\.jsdelivr\.net\/npm\/three@0\.128\.0\/)/, "библиотеки закреплены по версии: " + u));
   assert.equal(B3.hasWebGL(), false, "без браузера WebGL нет — mount честно откажет");
 });
+
+test("3D-нажатие: со стороны груди не выбирается спина и наоборот, из слоёв на одной глубине берётся ближайшая к точке нажатия", () => {
+  const B3 = require("../body3d.js");
+  const hits = [{ m: "lats", distance: 3.2, c: 0.4 }, { m: "chest", distance: 3.22, c: 0.1 }, { m: "abs", distance: 3.23, c: 0.3 }];
+  const byC = h => h.c;
+  assert.equal(B3.choose(hits, 1, 0.06, byC), "chest", "спереди широчайшая не мешает, из груди и пресса — ближе к центру");
+  assert.equal(B3.choose(hits, -1, 0.06, byC), "lats", "сзади грудь и пресс не выбираются");
+  assert.equal(B3.choose([{ m: "chest", distance: 3.2, c: 0 }], -1, 0.06, byC), "", "сзади одна грудь — ничего");
+  assert.equal(B3.choose([{ m: "chest", distance: 3.2, c: 0 }, { m: "quads", distance: 3.5, c: 0 }], 0, 0.06, byC), "chest", "боком берётся только то, что у поверхности");
+  assert.equal(B3.choose([], 1, 0.06, byC), "");
+  B3.BACK_ONLY.concat(B3.FRONT_ONLY).forEach(id => assert.ok(B3.muscles().includes(id), id));
+});
+
+test("3D-нажатие: сжатые в целые числа вершины модели переводятся в дробные (иначе луч читает их как есть и попадает случайно)", () => {
+  const B3 = require("../body3d.js");
+  class Attr { constructor(a, n) { this.array = a; this.itemSize = n; } }
+  const geom = { attributes: { position: { array: new Int16Array([32767, -32767, 0, -32768, 16384, 8192]), normalized: true } }, setAttribute(k, v) { this.attributes[k] = v; }, computeBoundingSphere() { this.sphere = true; }, computeBoundingBox() { this.box = true; } };
+  B3.dequantize({ BufferAttribute: Attr }, geom);
+  const p = geom.attributes.position.array;
+  assert.ok(p instanceof Float32Array);
+  assert.deepEqual([...p].map(v => Math.round(v * 1000) / 1000), [1, -1, 0, -1, 0.5, 0.25]);
+  assert.ok(geom.sphere && geom.box);
+  const f = { attributes: { position: { array: new Float32Array([1, 2, 3]) } }, setAttribute() { throw new Error("не трогать"); } };
+  B3.dequantize({}, f);
+});

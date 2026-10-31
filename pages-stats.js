@@ -223,7 +223,7 @@
     const hist = st.sessions.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.startedAt || "") < (b.startedAt || "") ? 1 : -1)).slice(0, 20);
     const tabs = [["week", "Неделя"], ["month", "Месяц"], ["year", "Год"], ["all", "Всё"]].map(([v, l]) => `<a class="seg-b ${per === v ? "on" : ""}" href="#/stats/${v}" aria-current="${per === v}"><b>${l}</b></a>`).join("");
     const empty = !st.sessions.length && !sum.marks;
-    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Статистика</h1>
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Статистика</h1>${P.ideaChips(["N1"])}
       <div class="seg stat-tabs" role="navigation" aria-label="Период">${tabs}</div>
       <div class="kpis kpis3"><div class="card kpi"><div class="kv">${sum.workouts}</div><div class="kl">Тренировок</div></div><div class="card kpi"><div class="kv">${sum.seconds ? esc(S0.fmtTime(sum.seconds)) : "—"}</div><div class="kl">Время</div></div><div class="card kpi"><div class="kv">${sum.tonnage ? esc(S0.fmtKg(sum.tonnage)) : "—"}</div><div class="kl">Поднято всего</div></div></div>
       ${sum.marks ? `<p class="muted tiny">${sum.marks} из них отмечены без записи подходов: у них нет веса и времени. Чтобы они считались, записывай подходы.</p>` : ""}

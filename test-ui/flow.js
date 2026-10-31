@@ -226,12 +226,13 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok(!/Главное по просьбе/.test(text(w, "main")), "идеи: прежнего блока «Главное по просьбе Айдархана» нет");
   ok(heads.indexOf("Все идеи") >= 0 && heads.indexOf("Основа платформы из переписки") > heads.indexOf("Все идеи"), "идеи: «Основа платформы из переписки» стоит ниже списка идей, отдельным блоком");
   ok(/не 11 идей Айдархана/.test(text(w, "main")) && /В проценты выше не входит/.test(text(w, "main")), "идеи: подписано, что основа не его идеи и в проценты не входит");
-  ok($$(w, "#ideaslist .idea").length === 44 && $$(w, ".idea").length === 50, "идеи: 44 идеи в списке и 6 пунктов основы отдельно");
+  ok($$(w, "#ideaslist .idea").length === 44 && $$(w, ".idea").length === 51, "идеи: 44 идеи в списке, 6 пунктов основы и 1 добавленная позже отдельно");
   click(w, $(w, '[data-who="aidarkhan"]'));
   ok($$(w, "#ideaslist .idea").length === 11 && $$(w, "#ideaslist .idea .ask").length === 11, "идеи: у всех 11 идей Айдархана показана его формулировка");
   ok(/Встроенный маркетплейс/.test(text(w, "#idea-B1")) && /правила безопасности и пошаговая техника/.test(text(w, "#idea-B2")), "идеи: тексты идей взяты из его списка");
   click(w, $(w, '[data-who=""]'));
-  const foundationStatus = $$(w, ".idea").slice(44).map(e => e.querySelector(".st").textContent);
+  ok(heads.indexOf("Добавлено позже") > heads.indexOf("Основа платформы из переписки") && /Статистика тренировок/.test(text(w, "#idea-N1")) && /Айдархан/.test(text(w, "#idea-N1")), "идеи: статистика тренировок записана отдельным блоком как идея Айдархана");
+  const foundationStatus = $$(w, ".idea").slice(44, 50).map(e => e.querySelector(".st").textContent);
   ok(foundationStatus.join() === "Готово,Частично,Частично,Частично,Готово,Частично", "идеи: статусы основы совпадают с идеями Сани: " + foundationStatus.join());
   ok($$(w, ".idea").slice(44).filter(e => /Статус общий с идеей Сани/.test(e.textContent)).length === 4, "идеи: у четырёх пунктов основы указано, с какой идеей Сани статус общий");
   await go(w, "#/ideas/K5");
