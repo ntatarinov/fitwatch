@@ -1,11 +1,11 @@
 {
   "name": "fitwatch",
   "private": true,
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "FitWatch: fitness app (static site + one serverless API function, Neon Postgres)",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "test:ui": "node test-ui/flow.js && node test-ui/account-flow.js && node test-ui/trainer-flow.js && node test-ui/telegram-flow.js"
+    "test:ui": "node test-ui/flow.js && node test-ui/account-flow.js && node test-ui/trainer-flow.js && node test-ui/telegram-flow.js && node test-ui/guide-flow.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0"

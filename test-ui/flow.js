@@ -12,7 +12,7 @@ function load() {
   const vc = new VirtualConsole();
   vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0]));
   vc.on("error", e => errors.push(String(e)));
-  const dom = new JSDOM(html, { url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc, beforeParse(win) { win.scrollTo = () => {}; win.HTMLCanvasElement.prototype.getContext = () => null; } });
+  const dom = new JSDOM(html, { url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc, beforeParse(win) { try { win.localStorage.setItem("fitwatch.ui", JSON.stringify({ mode: "pro", onboarded: true })); } catch (e) { /* без хранилища */ } win.scrollTo = () => {}; win.HTMLCanvasElement.prototype.getContext = () => null; } });
   dom.window.alert = msg => { dom.window.__alerts = (dom.window.__alerts || []).concat(msg); };
   dom.window.confirm = () => true;
   dom.window.scrollTo = () => {};

@@ -21,6 +21,7 @@ function openApp(db, ip) {
   const dom = new JSDOM(html, {
     url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
+      try { w.localStorage.setItem("fitwatch.ui", JSON.stringify({ mode: "pro", onboarded: true })); } catch (e) { /* без хранилища */ } 
       w.scrollTo = () => {}; w.HTMLCanvasElement.prototype.getContext = () => null;
       w.fetch = async (url, init) => {
         init = init || {};

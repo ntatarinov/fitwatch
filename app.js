@@ -303,9 +303,25 @@
   // ---------- страницы ----------
   const doneDays = p => p.days.filter(d => state.log.some(l => l.p === p.id && l.d === d.id)).length;
 
+  // Данные для чек-листа «Первые шаги»: считаются из прогресса и входа в аккаунт.
+  function stepsCtx() {
+    return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref() };
+  }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
-    app.innerHTML = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>` +
+    const head = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
+    if (!window.Guide.isPro()) {
+      // Простой режим: что делать сейчас, неделя и уровень. Остальное за кнопкой Pro.
+      const st = window.Guide.steps(stepsCtx());
+      const steps = window.Guide.stepsHidden() ? "" : PAGES.stepsCard(st, false);
+      const install = !window.Guide.installHidden() && window.Pwa ? window.Pwa.card({ dismissible: true }) : "";
+      // Пока нет плана, ведёт чек-лист: совет дня с отзывом или тренировкой новичка только запутал бы.
+      const advice = state.plan || window.Guide.stepsHidden() ? adviceHtml() : "";
+      app.innerHTML = head + steps + advice + weekCardHtml() + levelCardHtml() + planCardHtml() + install + PAGES.proTeaser();
+      animateBars();
+      return;
+    }
+    app.innerHTML = head +
       adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + sleepCardHtml() + PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") +
       "</div>";
@@ -316,14 +332,15 @@
     const planLink = state.plan
       ? `<a class="card" href="#/plan"><div class="row"><div><b>📅 Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${state.plan.days.length} дн. в неделю</div></div><span class="pill">Открыть</span></div></a>`
       : `<a class="card" href="#/me"><div class="row"><div><b>📅 Мой план</b><div class="muted">Подберём тренировки под твою цель</div></div><span class="pill">Подобрать</span></div></a>`;
-    app.innerHTML = "<h1>Тренировки</h1>" + planLink +
-      `<a class="card" href="#/trainers"><div class="row"><div><b>👥 Тренеры и чат</b><div class="muted">Персональный тренер, переписка, согласие на доступ к данным</div></div><span class="pill">Открыть</span></div></a>` +
+    const pro = window.Guide.isPro();
+    const proCards = pro ? `<a class="card" href="#/trainers"><div class="row"><div><b>👥 Тренеры и чат</b><div class="muted">Персональный тренер, переписка, согласие на доступ к данным</div></div><span class="pill">Открыть</span></div></a>` +
       `<a class="card" href="#/premium"><div class="row"><div><b>💎 Расширенные программы</b><div class="muted">Программы на 4–8 недель по подписке</div></div><span class="pill">Открыть</span></div></a>` +
-      `<a class="card" href="#/trainer"><div class="row"><div><b>💬 Тренер</b><div class="muted">Диалог по правилам: цель, питание, самочувствие</div></div><span class="pill">Открыть</span></div></a>` +
+      `<a class="card" href="#/trainer"><div class="row"><div><b>💬 Тренер</b><div class="muted">Диалог по правилам: цель, питание, самочувствие</div></div><span class="pill">Открыть</span></div></a>` : "";
+    app.innerHTML = "<h1>Тренировки</h1>" + planLink + proCards +
       `<a class="card" href="#/library"><div class="row"><div><b>🧍 Каталог упражнений</b><div class="muted">По мышцам, оборудованию и уровню, с моделью тела</div></div><span class="pill">${window.Catalog.EXERCISES.length}</span></div></a>` +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
       `<a class="card" href="#/p/${p.id}"><div class="row"><div><b>${p.icon || ""} ${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
-        <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("");
+        <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("") + (pro ? "" : PAGES.proTeaser());
   }
 
   // --- тренер: чат по правилам, без ИИ ---
@@ -515,37 +532,43 @@
       if (!p) return `<li>${esc(l.date)} · ${esc(l.t || l.p + "/" + l.d)} · +${l.points}</li>`;
       return `<li>${esc(l.date)} · ${esc(p ? p.title : l.p)} · ${esc(d ? d.title : l.d)} · +${l.points}</li>`;
     }).join("");
+    const pro = window.Guide.isPro();
+    const installCard = window.Pwa ? window.Pwa.card() : "";
     app.innerHTML = `<h1>Профиль</h1>
+      <div class="card"><div class="row"><b>Режим</b><a class="pill" href="#/guide">Как пользоваться</a></div>${PAGES.modeSwitch()}</div>
+      ${installCard}
       ${PAGES.accountCard(FW)}
-      ${PAGES.ideasCard()}
+      ${pro ? PAGES.ideasCard() : ""}
       <div class="card"><div class="muted">Баллы</div><div class="big">${totalPoints()}</div></div>
       ${statsHtml()}
       ${badgesHtml()}
-      ${profileCardHtml()}
+      ${pro ? profileCardHtml() : ""}
       ${meCardHtml()}
       <div class="card"><label class="muted">Имя</label><div class="row" style="margin-top:6px"><input id="name" value="${esc(state.name)}" maxlength="30" style="flex:1"><button id="saveName">Сохранить</button></div></div>
       <div class="card"><b>Тренировки (${state.log.length})</b>${history ? "<ul>" + history + "</ul>" : "<p class='muted'>Пока нет — откройте программу и отметьте первую тренировку.</p>"}</div>
-      <div class="card"><b>Изучена техника (${doneVideos.length})</b>${doneVideos.length ? "<ul>" + doneVideos.map(({ p, e }) => `<li>${esc(e.title)} · ${esc(p.title)} · +${e.points}</li>`).join("") + "</ul>" : "<p class='muted'>Пока нет видео.</p>"}</div>
+      ${pro ? `<div class="card"><b>Изучена техника (${doneVideos.length})</b>${doneVideos.length ? "<ul>" + doneVideos.map(({ p, e }) => `<li>${esc(e.title)} · ${esc(p.title)} · +${e.points}</li>`).join("") + "</ul>" : "<p class='muted'>Пока нет видео.</p>"}</div>
       <div class="card"><b>Выгрузка для разбора</b><p class="muted">Отчёт с отзывами, профилем и тренировками. Отправь его тренеру или команде: из него видно свободные тексты и повторяющиеся жалобы.</p>
         <div class="row"><button id="copy">Скопировать</button><button id="dl" class="ghost">Скачать .md</button></div><textarea id="rep" rows="6" readonly style="width:100%;margin-top:10px"></textarea></div>
       <div class="card"><b>Для демонстрации</b><p class="muted">Заполнить двухнедельными демо-данными, чтобы сразу показать профиль и советы. Текущие данные будут заменены.</p>
-        <div class="row"><button id="demo" class="ghost">Загрузить демо</button><button class="ghost" id="reset">Сбросить прогресс</button></div></div>`;
+        <div class="row"><button id="demo" class="ghost">Загрузить демо</button><button class="ghost" id="reset">Сбросить прогресс</button></div></div>` : ""}`;
+    // Блок для Pro есть не всегда: обработчики вешаются только на то, что есть на странице.
+    const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
     const rep = document.getElementById("rep");
-    rep.value = buildReport();
-    document.getElementById("copy").onclick = () => {
+    if (rep) rep.value = buildReport();
+    on("copy", () => {
       rep.select();
       try { navigator.clipboard.writeText(rep.value); } catch (e) { document.execCommand("copy"); }
       document.getElementById("copy").textContent = "Скопировано ✓";
-    };
-    document.getElementById("dl").onclick = () => {
+    });
+    on("dl", () => {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([rep.value], { type: "text/markdown;charset=utf-8" }));
       a.download = "fitwatch-report-" + today() + ".md";
       a.click();
-    };
-    document.getElementById("saveName").onclick = () => { state.name = document.getElementById("name").value.trim() || "Гость"; save(); profile(); };
-    document.getElementById("demo").onclick = () => { if (confirm("Заменить текущие данные демо-данными?")) { loadDemo(); profile(); } };
-    document.getElementById("reset").onclick = () => { if (confirm("Сбросить все баллы и прогресс?")) { state = Object.assign(fresh(), { name: state.name, me: state.me, plan: state.plan }); save(); profile(); } };
+    });
+    on("saveName", () => { state.name = document.getElementById("name").value.trim() || "Гость"; save(); profile(); });
+    on("demo", () => { if (confirm("Заменить текущие данные демо-данными?")) { loadDemo(); profile(); } });
+    on("reset", () => { if (confirm("Сбросить все баллы и прогресс?")) { state = Object.assign(fresh(), { name: state.name, me: state.me, plan: state.plan }); save(); profile(); } });
   }
 
   function notFound() { app.innerHTML = "<h1>Не найдено</h1><a class='back' href='#/'>← На главную</a>"; }
@@ -592,18 +615,20 @@
     else if (a === "account") PAGES.account(FW, b);
     else if (a === "rating") PAGES.rating(FW, b);
     else if (a === "body") PAGES.body(FW, b);
+    else if (a === "guide") PAGES.guide(FW);
     else if (a === "checkin") checkin();
     else if (a === "food") food();
     else if (a === "profile") profile();
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "programs", client: "programs", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "programs", client: "programs", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     window.scrollTo(0, 0);
   }
   // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
   const PAGES = window.PAGES;
+  PAGES.stepsCtx = stepsCtx;
   const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
   const snd = document.getElementById("snd");
   const paintSnd = () => { const on = window.FX.enabled(); snd.textContent = on ? "🔊" : "🔇"; snd.setAttribute("aria-pressed", String(on)); snd.title = on ? "Звук включён" : "Звук выключен"; };
@@ -614,5 +639,12 @@
   window.Account.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "account", "rating", "body"].includes(a)) route(); });
   window.Account.refresh();
   renderBadge();
+  // Режим и гайды: переключение перерисовывает страницу; приветствие показывается один раз.
+  const guideToast = m => window.FX.toast(m === "pro" ? "Режим Pro: показаны все функции" : "Простой режим: только самое нужное", m === "pro" ? "⚡" : "🌱");
+  PAGES.bindGuide({ rerender: route });
+  window.Guide.onMode(m => { route(); guideToast(m); });
+  window.Guide.apply();
+  if (window.Pwa) { window.Pwa.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "guide"].includes(a)) route(); }); window.Pwa.init(); }
   route();
+  if (window.Guide.needsOnboarding()) window.Guide.showOnboarding(document, { onDone: () => route() });
 })();

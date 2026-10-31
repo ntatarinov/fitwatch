@@ -150,7 +150,7 @@
     let head = "";
     if (s.status === "anon") head = ctaCard(FW, "Войди, чтобы попасть в рейтинг и получать бонусы за серию.");
     else if (!s.user.ratingOptIn) head = `<div class="card"><p>Вы пока не участвуете в рейтинге: другие вас не видят.</p><button id="joinrate" type="button">Участвовать в рейтинге</button> <span class="muted tiny">Увидят только имя и очки.</span></div>`;
-    app.innerHTML = `<h1>Рейтинг</h1>${P.ideaChips(["K5"])}<div class="chips">${tabs}</div>${head}<div id="lb"><div class="card"><p class="muted">Загружаю…</p></div></div>${how}`;
+    app.innerHTML = `<h1>Рейтинг</h1>${window.Guide.tip("rating")}${P.ideaChips(["K5"])}<div class="chips">${tabs}</div>${head}<div id="lb"><div class="card"><p class="muted">Загружаю…</p></div></div>${how}`;
     const join = document.getElementById("joinrate");
     if (join) join.onclick = async () => { await acc.setRating(true); P.rating(FW); };
     const r = await acc.leaderboard(period);

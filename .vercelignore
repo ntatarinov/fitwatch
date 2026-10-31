@@ -6,3 +6,4 @@ docs
 .vercelignore
 test
 test-ui
+scripts

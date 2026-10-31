@@ -98,7 +98,7 @@
         ${personal ? `<div class="row" style="gap:8px"><input data-note="${t.id}" placeholder="Что хотите: цель, ограничения (необязательно)" maxlength="300" style="flex:1"><button data-req="${t.id}" type="button">Запросить</button></div>`
           : `<a class="btn ghost-btn" href="#/tariffs">Нужна подписка «Персональный тренер»</a>`}</div>`).join("") : '<p class="muted">Подтверждённых тренеров пока нет.</p>';
     const coach = prof && prof.status === "approved";
-    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Тренеры</h1>${P.ideaChips(["A7", "K4"])}
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Тренеры</h1>${window.Guide.tip("trainers")}${P.ideaChips(["A7", "K4"])}
       <div class="card warn"><p class="muted" style="margin:0">${DISCLAIMER}</p></div>
       ${coach ? '<a class="btn" href="#/coach">Кабинет тренера</a>' : ""}
       <h2>Мои тренеры</h2>${myLinks}<h2>Выбрать тренера</h2><div class="status" id="terr" role="alert"></div>${trainers}

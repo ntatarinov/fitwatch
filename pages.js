@@ -12,7 +12,7 @@
     const chip = (name, val, label, checked, type) =>
       `<label class="chip"><input type="${type || "radio"}" name="${name}" value="${val}" ${checked ? "checked" : ""}><span>${esc(label)}</span></label>`;
     const nums = (name, list, cur, suffix) => `<div class="chips">${list.map(v => chip(name, v, v + (suffix || ""), Number(cur) === v)).join("")}</div>`;
-    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Моя цель</h1>
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Моя цель</h1>${window.Guide.tip("me")}
       <p class="muted">Ответь на несколько вопросов, и я подберу план тренировок. Всё хранится только на этом устройстве. Это общая подборка, а не медицинская или тренерская рекомендация.</p>
       <form id="meform" class="card">
         <label><b>Как тебя зовут?</b></label><input name="name" maxlength="30" value="${esc(st.name === "Гость" ? "" : st.name)}" placeholder="Имя" style="width:100%">
@@ -75,7 +75,7 @@
         <div class="muted">${d.items.map(i => esc((C.byId(i.ex) || { title: i.ex }).title)).join(" · ")}</div></div>
         <span class="pill ${t ? "done" : ""}">${t ? "✓ ×" + t : "+" + window.DAY_POINTS}</span></div></a>`;
     }).join("");
-    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Мой план</h1>
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Мой план</h1>${window.Guide.tip("plan")}
       ${P.ideaChips(["A6", "A28"])}
       <p class="muted">${esc(lab(PL.GOALS, p.goal))} · ${p.days} дн. в неделю по ${p.minutes} мин · ${esc(lab(PL.PLACES, p.place))} · ${esc(lab(C.LEVELS, p.level))}</p>
       ${plan.warnings.length ? `<div class="card warn"><b>Важно</b><ul>${plan.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
@@ -109,7 +109,7 @@
     const labels = Object.fromEntries(C.MUSCLES.map(m => [m.id, m.label]));
     const myLimits = (st.me && st.me.limits) || [];
     const sel = (id, list, cur, all) => `<select id="${id}" aria-label="${esc(all)}"><option value="">${esc(all)}</option>${list.map(o => `<option value="${o.id}" ${String(cur) === String(o.id) ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
-    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Каталог упражнений</h1>
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Каталог упражнений</h1>${window.Guide.tip("library")}
       ${P.ideaChips(["A1", "A2", "A3"])}
       <p class="muted" id="libcount"></p>
       <div class="card"><b>Выбери мышцу</b><p class="muted">Нажми на мышцу на схеме, и ниже останутся упражнения для неё. Схема упрощённая.</p>
@@ -172,7 +172,7 @@
     const bar = (v, max) => `<div class="bar" style="margin-top:4px"><i style="width:${max ? Math.min(100, v / max * 100) : 0}%"></i></div>`;
     const macro = (name, v, max) => `<div style="margin-top:8px"><div class="row"><span>${name}</span><span><b>${v}</b>${max ? " из " + max + " г" : " г"}</span></div>${max ? bar(v, max) : ""}</div>`;
 
-    app.innerHTML = `<h1>Питание</h1>${P.ideaChips(["A11", "B4"])}<p class="muted">Значения ориентировочные, из справочных таблиц. Это дневник, а не диета и не медицинская рекомендация.</p>
+    app.innerHTML = `<h1>Питание</h1>${window.Guide.tip("food")}${P.ideaChips(["A11", "B4"])}<p class="muted">Значения ориентировочные, из справочных таблиц. Это дневник, а не диета и не медицинская рекомендация.</p>
       <div class="card"><div class="row"><div><div class="big">${sum.kcal}</div><div class="muted">ккал из ${goal}</div></div>
         <div style="text-align:right"><label class="muted">Цель, ккал</label><br><input id="goal" type="number" min="800" max="6000" step="50" value="${goal}" style="width:100px"></div></div>
         ${bar(sum.kcal, goal)}
@@ -354,7 +354,7 @@
     const rows = (st.sleep || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 7);
     const avg = rows.length ? Math.round(rows.reduce((s, r) => s + r.hours, 0) / rows.length * 10) / 10 : null;
     const q = ["", "плохо", "так себе", "нормально", "хорошо", "отлично"];
-    app.innerHTML = `<a class="back" href="#/">← Главная</a><h1>Сон</h1>${P.ideaChips(["A15"])}
+    app.innerHTML = `<a class="back" href="#/">← Главная</a><h1>Сон</h1>${window.Guide.tip("sleep")}${P.ideaChips(["A15"])}
       <p class="muted">Запиши, сколько ты спал прошлой ночью. Если сна меньше 6 часов, совет дня предложит лёгкую тренировку.</p>
       <form id="sform" class="card"><div class="row" style="gap:8px"><div><label class="muted">Часов</label><input name="hours" type="number" min="0" max="14" step="0.5" value="7.5" style="width:100px"></div>
         <div style="flex:1"><label class="muted">Как выспался</label><select name="q" style="width:100%">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === 3 ? "selected" : ""}>${n} · ${q[n]}</option>`).join("")}</select></div></div>
