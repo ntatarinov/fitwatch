@@ -8,10 +8,12 @@ function install(k) {
   async function loadLink(ctx, id) {
     const r = await ctx.db.query(
       `SELECT l.id, l.client_id, l.trainer_id, l.status, l.share_goals, l.share_results, l.note, l.created_at::text AS created,
-              cu.display_name AS client_name, tu.display_name AS trainer_name
-       FROM trainer_links l JOIN users cu ON cu.id = l.client_id JOIN users tu ON tu.id = l.trainer_id
+              cu.display_name AS client_name, tu.display_name AS trainer_name, tp.status AS trainer_status
+       FROM trainer_links l JOIN users cu ON cu.id = l.client_id JOIN users tu ON tu.id = l.trainer_id LEFT JOIN trainer_profiles tp ON tp.user_id = l.trainer_id
        WHERE l.id = $1 AND (l.client_id = $2 OR l.trainer_id = $2)`, [Number(id), ctx.user.id]);
     if (!r.length) throw new HttpError(404, "Не найдено"); // чужие связи не раскрываем
+    // Тренер, с которого администратор снял подтверждение, больше ничего не делает от имени тренера: ни данных клиентов, ни переписки.
+    if (r[0].trainer_id === ctx.user.id && r[0].trainer_status !== "approved") throw new HttpError(403, "Подтверждение тренера снято");
     return r[0];
   }
   const roleOf = (l, uid) => (l.client_id === uid ? "client" : "trainer");
@@ -82,6 +84,7 @@ function install(k) {
     } else {
       if (l.trainer_id !== u.id) throw new HttpError(403, "Это может сделать только тренер");
       if (l.status !== from) throw new HttpError(409, "Запрос уже обработан");
+      if (action === "accept" && TIER_RANK[(await tierOf(ctx.db, l.client_id)).tier] < TIER_RANK.personal) throw new HttpError(409, "У клиента закончилась подписка «Персональный тренер»");
     }
     await ctx.db.query("UPDATE trainer_links SET status = $1, updated_at = now() WHERE id = $2", [to, l.id]);
     return { status: 200, body: { id: Number(l.id), status: to } };
@@ -136,6 +139,8 @@ function install(k) {
   route("POST", "/api/links/:id/messages", async ctx => {
     const u = needUser(ctx), l = await loadLink(ctx, ctx.params[0]);
     if (l.status !== "active") throw new HttpError(409, "Переписка закрыта");
+    // Переписка с тренером входит в подписку клиента: без неё новые сообщения не отправляются (история остаётся).
+    if (TIER_RANK[(await tierOf(ctx.db, l.client_id)).tier] < TIER_RANK.personal) throw new HttpError(403, "Переписка доступна с подпиской «Персональный тренер»");
     const body = V.str(ctx.body.body, 1, 2000);
     if (!body) throw bad("Сообщение: от 1 до 2000 символов");
     const n = await ctx.db.query("SELECT count(*)::int AS n FROM messages WHERE sender_id = $1 AND created_at > now() - interval '1 minute'", [u.id]);
@@ -158,6 +163,8 @@ function install(k) {
     adminOnly(ctx);
     const r = await ctx.db.query("UPDATE trainer_profiles SET status = $1, decided_at = now() WHERE user_id = $2 RETURNING status", [to, ctx.params[0].toLowerCase()]);
     if (!r.length) throw new HttpError(404, "Заявка не найдена");
+    // Снятое подтверждение закрывает все открытые связи тренера: клиенты больше не ждут его и не показывают ему данные.
+    if (to === "rejected") await ctx.db.query("UPDATE trainer_links SET status = 'ended', updated_at = now() WHERE trainer_id = $1 AND status IN ('requested','active')", [ctx.params[0].toLowerCase()]);
     return { status: 200, body: { status: r[0].status } };
   });
   verdict("approve", "approved");

@@ -151,3 +151,22 @@ test("установка: состояния и карточка для теле
   P = freshPwa({ nav: { userAgent: "iPhone", standalone: true } });
   assert.equal(P.status(), "installed");
 });
+
+test("заголовки безопасности для всех страниц: нельзя встроить сайт в чужую страницу, тип файлов не угадывается", () => {
+  const v = JSON.parse(read("vercel.json")), all = (v.headers.find(x => x.source === "/(.*)") || { headers: [] }).headers;
+  const get = k => (all.find(h => h.key === k) || {}).value || "";
+  assert.equal(get("X-Content-Type-Options"), "nosniff");
+  assert.equal(get("X-Frame-Options"), "DENY");
+  assert.match(get("Content-Security-Policy"), /frame-ancestors 'none'/);
+  assert.ok(get("Referrer-Policy"));
+});
+
+test("битый JSON в запросе: понятный ответ 400, а не пустой", async () => {
+  const fn = require("../api/index.js");
+  let status = 0, json = null;
+  const res = { setHeader() {}, status(s) { status = s; return this; }, json(b) { json = b; return this; } };
+  const req = { method: "POST", url: "/api/auth/login", query: {}, headers: {}, get body() { throw new SyntaxError("Invalid JSON"); } };
+  await fn(req, res);
+  assert.equal(status, 400);
+  assert.equal(json.error, "Неверный формат запроса");
+});

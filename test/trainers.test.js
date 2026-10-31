@@ -1,6 +1,6 @@
 const test = require("node:test"), assert = require("node:assert/strict");
-process.env.ADMIN_EMAILS = "u900@test.kz";
-const { makeDb, client, newUser } = require("./api.helpers");
+process.env.ADMIN_EMAILS = "u900@test.kz"; // должна НЕ давать прав: проверяется ниже
+const { makeDb, client, newUser, makeAdmin } = require("./api.helpers");
 const P = require("../api/_lib/programs");
 
 let db;
@@ -27,6 +27,9 @@ test("программы: упражнения есть в каталоге, ф�
 
 dbtest("тариф и промокоды: права администратора, погашение, лимиты, продление", async () => {
   const admin = await newUser(db, 900), a = await newUser(db, 901), b = await newUser(db, 902);
+  assert.equal((await admin.call("GET", "/api/me")).body.user.isAdmin, false, "почта из ADMIN_EMAILS прав администратора не даёт");
+  assert.equal((await admin.call("POST", "/api/admin/promo", { tier: "personal", days: 30, maxUses: 1 })).status, 403);
+  await makeAdmin(db, "u900@test.kz");
   assert.equal((await admin.call("GET", "/api/me")).body.user.isAdmin, true);
   assert.equal((await a.call("GET", "/api/me")).body.user.isAdmin, false);
   assert.equal((await client(db).call("GET", "/api/subscription")).status, 401);
@@ -53,17 +56,30 @@ dbtest("тариф и промокоды: права администратор�
   assert.equal((await a.call("POST", "/api/subscription/redeem", { code: "PREM-ONE" })).status, 409);  // тот же человек
   assert.equal((await b.call("POST", "/api/subscription/redeem", { code: "PREM-ONE" })).status, 404);  // лимит исчерпан
   assert.equal((await db.query("SELECT used FROM promo_codes WHERE code = 'PREM-ONE'"))[0].used, 1);
-  // персональный после премиума; затем премиум не понижает тариф и продлевает срок
+  // повышение до персонального: срок считается от сегодня (оставшийся премиум не превращается в персональный)
   await admin.call("POST", "/api/admin/promo", { tier: "personal", days: 10, maxUses: 5, code: "PERS-TEN" });
+  await admin.call("POST", "/api/admin/promo", { tier: "personal", days: 5, maxUses: 5, code: "PERS-FIVE" });
   await admin.call("POST", "/api/admin/promo", { tier: "premium", days: 20, maxUses: 5, code: "PREM-TWENTY" });
-  assert.equal((await a.call("POST", "/api/subscription/redeem", { code: "PERS-TEN" })).body.tier, "personal");
-  const ext = await a.call("POST", "/api/subscription/redeem", { code: "PREM-TWENTY" });
+  const days = until => (new Date(until) - Date.now()) / 86400000;
+  const up = await a.call("POST", "/api/subscription/redeem", { code: "PERS-TEN" });
+  assert.equal(up.body.tier, "personal");
+  assert.ok(days(up.body.until) > 9.9 && days(up.body.until) < 10.1, "персональный на 10 дней от сегодня: " + days(up.body.until));
+  // код младшего тарифа во время персонального не тратится и не продлевает его
+  const low = await a.call("POST", "/api/subscription/redeem", { code: "PREM-TWENTY" });
+  assert.equal(low.status, 409);
+  assert.equal((await db.query("SELECT used FROM promo_codes WHERE code = 'PREM-TWENTY'"))[0].used, 0, "код не потрачен");
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM promo_redemptions WHERE code = 'PREM-TWENTY'"))[0].n, 0);
+  // тот же тариф продлевает срок
+  const ext = await a.call("POST", "/api/subscription/redeem", { code: "PERS-FIVE" });
   assert.equal(ext.body.tier, "personal");
-  assert.ok(new Date(ext.body.until) > new Date(Date.now() + 49 * 86400000));
-  // срок истёк → бесплатный
+  assert.ok(days(ext.body.until) > 14.9 && days(ext.body.until) < 15.1, "продление на 5 дней: " + days(ext.body.until));
+  // срок истёк → бесплатный; теперь премиум-код срабатывает
   await db.query("UPDATE subscriptions SET until = now() - interval '1 day' WHERE user_id = (SELECT id FROM users WHERE email = 'u901@test.kz')");
   assert.equal((await a.call("GET", "/api/subscription")).body.tier, "free");
   assert.ok((await a.call("GET", "/api/programs")).body.items.every(p => p.locked));
+  const after = await a.call("POST", "/api/subscription/redeem", { code: "PREM-TWENTY" });
+  assert.equal(after.body.tier, "premium");
+  assert.ok(days(after.body.until) > 19.9 && days(after.body.until) < 20.1);
 });
 
 async function makeTrainer(n) {

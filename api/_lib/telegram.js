@@ -60,6 +60,10 @@ async function loadJwks(force) {
 function install(k) {
   const { route, HttpError, V, S, createSession, tooMany, noteAttempt } = k;
   const enabled = () => !!clientIdOf();
+  // Одноразовое значение привязано к браузеру, который его запросил: в cookie лежит его хэш. Чужой перехваченный id_token без этой cookie не сработает.
+  const NONCE_COOKIE = "fw_tgn";
+  const nonceHash = n => crypto.createHash("sha256").update(String(n)).digest("base64url");
+  const nonceCookie = (v, secure, age) => NONCE_COOKIE + "=" + v + "; HttpOnly; SameSite=Lax; Path=/api/auth/telegram; Max-Age=" + age + (secure ? "; Secure" : "");
 
   // Публичные настройки страницы: Client ID бота (публичное число), если вход включён.
   route("GET", "/api/config", async () => ({ status: 200, body: { telegramEnabled: enabled(), telegramClientId: enabled() ? Number(clientIdOf()) : null } }));
@@ -73,7 +77,7 @@ function install(k) {
     await db.query("DELETE FROM login_nonces WHERE created_at < now() - interval '15 minutes'");
     const nonce = crypto.randomBytes(16).toString("base64url");
     await db.query("INSERT INTO login_nonces(nonce) VALUES ($1)", [nonce]);
-    return { status: 200, body: { nonce } };
+    return { status: 200, body: { nonce }, cookies: [nonceCookie(nonceHash(nonce), ctx.secure, 900)] };
   });
 
   route("POST", "/api/auth/telegram", async ctx => {
@@ -88,6 +92,7 @@ function install(k) {
       if (e.message === "kid" && !provider) { try { claims = verifyIdToken(body.id_token, { clientId: clientIdOf(), jwks: await loadJwks(true), nowSec }); } catch (e2) { /* ниже отказ */ } }
       if (!claims) { await noteAttempt(db, ["tg:" + ip]); throw deny(); }
     }
+    if (typeof claims.nonce !== "string" || ctx.cookies[NONCE_COOKIE] !== nonceHash(claims.nonce)) { await noteAttempt(db, ["tg:" + ip]); throw new HttpError(401, "Вход устарел, нажмите кнопку ещё раз"); }
     const used = await db.query("DELETE FROM login_nonces WHERE nonce = $1 AND created_at > now() - interval '15 minutes' RETURNING nonce", [claims.nonce]);
     if (!used.length) { await noteAttempt(db, ["tg:" + ip]); throw new HttpError(401, "Вход устарел, нажмите кнопку ещё раз"); }
     const tgId = String(claims.id !== undefined ? claims.id : claims.sub);
@@ -101,7 +106,7 @@ function install(k) {
       const taken = await db.query("SELECT id FROM users WHERE telegram_id = $1::bigint AND id <> $2", [tgId, ctx.user.id]);
       if (taken.length) throw new HttpError(409, "Этот Telegram уже привязан к другому аккаунту");
       await db.query("UPDATE users SET telegram_id = $1::bigint, telegram_username = $2 WHERE id = $3", [tgId, username, ctx.user.id]);
-      return { status: 200, body: { linked: true } };
+      return { status: 200, body: { linked: true }, cookies: [nonceCookie("", ctx.secure, 0)] };
     }
     let rows = await db.query("SELECT id, display_name, role, rating_opt_in FROM users WHERE telegram_id = $1::bigint", [tgId]);
     let created = false;
@@ -116,7 +121,7 @@ function install(k) {
       if (created) await db.query("INSERT INTO profiles(user_id) VALUES ($1) ON CONFLICT DO NOTHING", [rows[0].id]);
     } else if (username) await db.query("UPDATE users SET telegram_username = $1 WHERE id = $2", [username, rows[0].id]);
     const u = rows[0], tok = await createSession(db, u.id);
-    return { status: created ? 201 : 200, body: { user: { name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in }, created }, cookies: [S.sessionCookie(tok, { secure: ctx.secure })] };
+    return { status: created ? 201 : 200, body: { user: { name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in }, created }, cookies: [S.sessionCookie(tok, { secure: ctx.secure }), nonceCookie("", ctx.secure, 0)] };
   });
 }
 module.exports = { install, verifyIdToken, setJwksProvider, decodeJwt, ISSUER, clientIdOf };

@@ -168,3 +168,16 @@ dbtest("без настроек вход через Telegram отключён", 
   assert.deepEqual((await c.call("GET", "/api/config")).body, { telegramEnabled: false, telegramClientId: null });
   process.env.TELEGRAM_CLIENT_ID = saved;
 });
+
+dbtest("nonce привязан к браузеру: перехваченный токен из другого браузера не входит", async () => {
+  const owner = browser("30.0.1.1"), thief = browser("30.0.1.2");
+  const nonce = await nonceFor(owner);
+  assert.match(owner.cookie(), /fw_tgn=/, "браузер получил cookie с хэшем nonce");
+  const tok = jwt(claims({ nonce, id: 4001, sub: "4001" }));
+  const stolen = await thief.call("POST", "/api/auth/telegram", { id_token: tok });
+  assert.equal(stolen.status, 401, "чужой браузер без cookie не входит");
+  const ok = await owner.call("POST", "/api/auth/telegram", { id_token: tok });
+  assert.equal(ok.status, 201, "хозяин входит: nonce не был потрачен попыткой вора");
+  assert.ok(!/fw_tgn=/.test(owner.cookie()), "после входа cookie с nonce удалена");
+  assert.match(owner.cookie(), /fw_session=/);
+});

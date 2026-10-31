@@ -1,6 +1,6 @@
 // Сквозная проверка тренеров, тарифов и закрытых программ: четыре «браузера» (администратор, тренер, клиент, посторонний)
 // работают через интерфейс с общей базой PGlite. Запуск: npm i --no-save jsdom @electric-sql/pglite && node test-ui/trainer-flow.js
-process.env.ADMIN_EMAILS = "admin@test.kz";
+process.env.ADMIN_EMAILS = "admin@test.kz"; // прав не даёт: администратор задаётся по ID аккаунта (ниже)
 const fs = require("fs"), path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
 const ROOT = path.join(__dirname, "..");
@@ -17,7 +17,8 @@ function openApp(db, ip) {
   html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + "</script>");
   const errors = [], vc = new VirtualConsole();
   vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0])); vc.on("error", e => errors.push(String(e)));
-  let cookie = "";
+  const jar = {}; // несколько cookie, как в браузере
+  const cookieHeader = () => Object.keys(jar).map(k => k + "=" + jar[k]).join("; ");
   const dom = new JSDOM(html, {
     url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
@@ -27,9 +28,9 @@ function openApp(db, ip) {
         init = init || {};
         const u = new URL(url, "http://localhost"), headers = { host: "localhost", "x-forwarded-for": ip };
         Object.keys(init.headers || {}).forEach(k => { headers[k.toLowerCase()] = init.headers[k]; });
-        if (cookie) headers.cookie = cookie;
+        if (cookieHeader()) headers.cookie = cookieHeader();
         const res = await handle({ method: init.method || "GET", path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body ? JSON.parse(init.body) : undefined, headers }, { db });
-        (res.cookies || []).forEach(sc => { const [k, v] = sc.split(";")[0].split("="); cookie = v === "" ? "" : k + "=" + v; });
+        (res.cookies || []).forEach(sc => { const kv = sc.split(";")[0], i = kv.indexOf("="), k = kv.slice(0, i), v = kv.slice(i + 1); if (v === "" || /Max-Age=0\b/.test(sc)) delete jar[k]; else jar[k] = v; });
         return { ok: res.status < 400, status: res.status, json: async () => res.body };
       };
     },
@@ -61,7 +62,10 @@ async function register(w, name, email) {
   await tick(100);
   await register(adm.w, "Админ", "admin@test.kz"); await register(trn.w, "Тренер Марат", "marat@test.kz");
   await register(cli.w, "Клиент Дана", "dana@test.kz"); await register(str.w, "Посторонний", "stranger@test.kz");
-  ok(adm.w.Account.state.user.isAdmin === true && cli.w.Account.state.user.isAdmin === false, "администратор определяется по почте из настроек");
+  ok(adm.w.Account.state.user.isAdmin === false, "почта из ADMIN_EMAILS сама по себе прав администратора не даёт");
+  process.env.ADMIN_USER_IDS = (await db.query("SELECT id FROM users WHERE email = 'admin@test.kz'"))[0].id;
+  await adm.w.Account.refresh();
+  ok(adm.w.Account.state.user.isAdmin === true && cli.w.Account.state.user.isAdmin === false, "администратор определяется по ID аккаунта из настроек");
 
   // ---- заявка тренера и подтверждение ----
   await go(trn.w, "#/trainers");

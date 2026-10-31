@@ -14,19 +14,21 @@ async function makeDb() {
 
 // Клиент с «браузерным» хранилищем cookie. now — виртуальное время сервера.
 function client(db, start) {
-  let cookie = "", ip = "1.1.1.1", now = start ? new Date(start) : new Date("2026-11-02T10:00:00Z");
+  const jar = {}; // как в браузере: несколько cookie, пустое значение или Max-Age=0 удаляет
+  const cookie = () => Object.keys(jar).map(k => k + "=" + jar[k]).join("; ");
+  let ip = "1.1.1.1", now = start ? new Date(start) : new Date("2026-11-02T10:00:00Z");
   const c = {
     setNow: v => { now = new Date(v); },
     setIp: v => { ip = v; },
-    cookie: () => cookie,
+    cookie,
     async call(method, p, body, extra) {
       const headers = Object.assign({ host: "fitwatch.test", "x-forwarded-for": ip }, extra || {});
       if (method !== "GET") headers["x-fw"] = headers["x-fw"] === null ? undefined : "1";
-      if (cookie) headers.cookie = cookie;
+      if (cookie()) headers.cookie = cookie();
       let q = {}; const [pathOnly, qs] = p.split("?");
       if (qs) qs.split("&").forEach(kv => { const [k, v] = kv.split("="); q[k] = v; });
       const res = await handle({ method, path: pathOnly, query: q, body, headers }, { db, now });
-      (res.cookies || []).forEach(sc => { const kv = sc.split(";")[0]; const [k, v] = kv.split("="); cookie = v === "" ? "" : k + "=" + v; });
+      (res.cookies || []).forEach(sc => { const kv = sc.split(";")[0], i = kv.indexOf("="), k = kv.slice(0, i), v = kv.slice(i + 1); if (v === "" || /Max-Age=0\b/.test(sc)) delete jar[k]; else jar[k] = v; });
       return res;
     },
   };
@@ -39,4 +41,12 @@ async function newUser(db, n, opts) {
   if (r.status !== 201) throw new Error("register failed " + JSON.stringify(r.body));
   return c;
 }
-module.exports = { makeDb, client, newUser, handle };
+// Администратор задаётся по ID аккаунта (ADMIN_USER_IDS): почта для этого не годится, её никто не подтверждает.
+async function makeAdmin(db, email) {
+  const r = await db.query("SELECT id FROM users WHERE email = $1", [email]);
+  const ids = String(process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
+  if (!ids.includes(r[0].id)) ids.push(r[0].id);
+  process.env.ADMIN_USER_IDS = ids.join(",");
+  return r[0].id;
+}
+module.exports = { makeDb, client, newUser, handle, makeAdmin };

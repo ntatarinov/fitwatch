@@ -2,10 +2,11 @@
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const SLUG = /^[a-z0-9_-]{1,24}$/;
 
+// Длина считается в символах, как в базе (char_length): эмодзи — один символ, а не два. Нулевой символ база не принимает.
 function str(v, min, max) {
-  if (typeof v !== "string") return null;
-  const s = v.trim();
-  return s.length >= min && s.length <= max ? s : null;
+  if (typeof v !== "string" || v.includes("\u0000")) return null;
+  const s = v.trim(), n = [...s].length;
+  return n >= min && n <= max ? s : null;
 }
 function int(v, min, max) {
   const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;

@@ -1,7 +1,7 @@
 // Кабинет тренера: сводка по клиентам, дашборд клиента, заметки. Проверяется на настоящей базе Postgres в памяти (PGlite).
 const test = require("node:test"), assert = require("node:assert/strict");
 process.env.ADMIN_EMAILS = "u900@test.kz";
-const { makeDb, client, newUser } = require("./api.helpers");
+const { makeDb, client, newUser, makeAdmin } = require("./api.helpers");
 
 let db;
 test.before(async () => { db = await makeDb(); });
@@ -20,6 +20,7 @@ async function build() {
   const admin = client(db); admin.setIp("10.9.7.1");
   await admin.call("POST", "/api/auth/register", { email: "u900@test.kz", password: "password900", name: "Админ" }).catch(() => {});
   await admin.call("POST", "/api/auth/login", { email: "u900@test.kz", password: "password900" });
+  await makeAdmin(db, "u900@test.kz");
   await admin.call("POST", "/api/admin/promo", { tier: "personal", days: 60, maxUses: 50, code: "COACH-ALL" });
   const mkTrainer = async n => {
     const t = await newUser(db, n);

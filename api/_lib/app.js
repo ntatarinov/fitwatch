@@ -33,9 +33,9 @@ async function prevDays(db, userId, dayStr, limit) {
   return rows.map(r => V.dayNum(r.day));
 }
 
-async function insertWorkout(db, userId, w) {
+async function insertWorkout(db, userId, w, opts) {
   const prev = await prevDays(db, userId, w.day, 12);
-  const streak = streakWith(V.dayNum(w.day), prev), base = basePoints(w.program), bonus = bonusFor(streak);
+  const streak = streakWith(V.dayNum(w.day), prev), base = basePoints(w.program), bonus = opts && opts.noBonus ? 0 : bonusFor(streak);
   const rows = await db.query(
     `INSERT INTO workouts(user_id, day, program, day_id, title, base_points, bonus_points)
      VALUES ($1, $2::date, $3, $4, $5, $6, $7) ON CONFLICT (user_id, day) DO NOTHING RETURNING id`,
@@ -60,9 +60,10 @@ async function userFromCookie(db, cookies) {
   return { id: u.id, email: u.email, name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in,
     telegramId: u.telegram_id == null ? null : String(u.telegram_id), telegramUsername: u.telegram_username || null, hasPassword: !!u.has_password };
 }
-const adminList = () => String(process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
-const adminTg = () => String(process.env.ADMIN_TELEGRAM_IDS || "").split(",").map(x => x.trim()).filter(Boolean);
-const isAdmin = u => !!u && !!((u.email && adminList().includes(String(u.email).toLowerCase())) || (u.telegramId && adminTg().includes(String(u.telegramId))));
+// Администратор определяется только по подтверждённой личности: Telegram ID (его подтверждает Telegram) или ID аккаунта.
+// Почта не годится: её никто не подтверждает, и чужую ещё не зарегистрированную почту мог бы занять кто угодно.
+const envList = name => String(process.env[name] || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
+const isAdmin = u => !!u && !!((u.telegramId && envList("ADMIN_TELEGRAM_IDS").includes(String(u.telegramId))) || (u.id && envList("ADMIN_USER_IDS").includes(String(u.id).toLowerCase())));
 const publicUser = u => ({ email: u.email || null, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u),
   telegram: u.telegramId ? { linked: true, username: u.telegramUsername } : { linked: false }, hasPassword: !!u.hasPassword });
 
@@ -116,7 +117,7 @@ async function saveProfile(db, userId, fields) {
 
 // ---- маршруты ----
 const routes = [];
-const route = (method, pattern, fn) => routes.push({ method, re: new RegExp("^" + pattern.replace(/:uuid/g, "([0-9a-fA-F-]{36})").replace(/:id/g, "([0-9]+)") + "$"), fn });
+const route = (method, pattern, fn) => routes.push({ method, re: new RegExp("^" + pattern.replace(/:uuid/g, "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").replace(/:id/g, "([0-9]{1,15})") + "$"), fn });
 const needUser = ctx => { if (!ctx.user) throw new HttpError(401, "Нужно войти"); return ctx.user; };
 
 route("GET", "/api/health", async ctx => ({ status: 200, body: { ok: true, db: true, time: ctx.now.toISOString() } }));
@@ -146,7 +147,8 @@ route("POST", "/api/auth/login", async ctx => {
   const { db, body, ip } = ctx;
   const email = V.email(body.email), pw = typeof body.password === "string" ? body.password : "";
   const keys = ["ip:" + ip].concat(email ? ["email:" + email] : []);
-  if (await tooMany(db, keys, 10, 15)) throw new HttpError(429, "Слишком много попыток входа, подождите 15 минут");
+  // С одного адреса — 10 попыток. На одну почту со всех адресов — 50: иначе чужие неверные пароли блокировали бы хозяина почты.
+  if (await tooMany(db, ["ip:" + ip], 10, 15) || (email && await tooMany(db, ["email:" + email], 50, 15))) throw new HttpError(429, "Слишком много попыток входа, подождите 15 минут");
   const rows = email ? await db.query("SELECT id, password_hash, display_name, role, rating_opt_in FROM users WHERE email = $1", [email]) : [];
   const ok = rows.length ? await S.verifyPassword(pw, rows[0].password_hash) : (await S.verifyPassword(pw, "x"), false);
   if (!ok) { await noteAttempt(db, keys); throw new HttpError(401, "Неверная почта или пароль"); }
@@ -194,7 +196,8 @@ route("GET", "/api/measurements", async ctx => {
   const u = needUser(ctx);
   const kind = V.oneOf(ctx.query.kind || "weight", ["weight", "height"]);
   if (!kind) throw bad("Неверный вид замера");
-  const rows = await ctx.db.query("SELECT id, value, measured_on::text AS day FROM measurements WHERE user_id = $1 AND kind = $2 ORDER BY measured_on ASC LIMIT 400", [u.id, kind]);
+  const rows = await ctx.db.query("SELECT id, value, measured_on::text AS day FROM measurements WHERE user_id = $1 AND kind = $2 ORDER BY measured_on DESC LIMIT 400", [u.id, kind]);
+  rows.reverse(); // последние 400 замеров, по возрастанию даты
   return { status: 200, body: { kind, items: rows.map(r => ({ id: Number(r.id), value: Number(r.value), day: r.day })) } };
 });
 
@@ -221,6 +224,9 @@ route("DELETE", "/api/measurements/:id", async ctx => {
   const u = needUser(ctx);
   const r = await ctx.db.query("DELETE FROM measurements WHERE id = $1 AND user_id = $2 RETURNING kind", [Number(ctx.params[0]), u.id]);
   if (!r.length) throw new HttpError(404, "Замер не найден");
+  // В профиле остаётся последний оставшийся замер (или пусто), а не удалённый.
+  const col = r[0].kind === "weight" ? "weight_kg" : "height_cm";
+  await ctx.db.query(`UPDATE profiles SET ${col} = (SELECT value FROM measurements WHERE user_id = $1 AND kind = $2 ORDER BY measured_on DESC LIMIT 1), updated_at = now() WHERE user_id = $1`, [u.id, r[0].kind]);
   return { status: 200, body: { ok: true } };
 });
 
@@ -246,15 +252,19 @@ route("POST", "/api/workouts", async ctx => {
   return { status: 201, body: { day: w.day, points: r.base, bonus: r.bonus, total: r.total, streak: r.streak } };
 });
 
-// Перенос истории из браузера: до 60 записей за последние 30 дней; уже записанные дни пропускаются.
+// Перенос истории из браузера: один раз на аккаунт, только последние 14 дней, без бонусов за серию.
+// История из браузера ничем не подтверждена, поэтому её вклад в рейтинг ограничен; новые тренировки идут через /api/workouts.
+const SYNC_DAYS = 14;
 route("POST", "/api/workouts/sync", async ctx => {
   const u = needUser(ctx);
   const items = Array.isArray(ctx.body.items) ? ctx.body.items : null;
   if (!items || items.length > 60) throw bad("Нужен список до 60 тренировок");
-  const list = items.map(parseWorkout).filter(Boolean).filter(w => { const d = V.dayNum(w.day); return d <= ctx.todayNum + 1 && d >= ctx.todayNum - 30; });
+  const first = await ctx.db.query("UPDATE users SET history_synced_at = now() WHERE id = $1 AND history_synced_at IS NULL RETURNING id", [u.id]);
+  if (!first.length) return { status: 200, body: { added: 0, skipped: items.length, points: 0, already: true } };
+  const list = items.map(parseWorkout).filter(Boolean).filter(w => { const d = V.dayNum(w.day); return d <= ctx.todayNum && d > ctx.todayNum - SYNC_DAYS; });
   list.sort((a, b) => (a.day < b.day ? -1 : 1));
   let added = 0, points = 0;
-  for (const w of list) { const r = await insertWorkout(ctx.db, u.id, w); if (r) { added++; points += r.total; } }
+  for (const w of list) { const r = await insertWorkout(ctx.db, u.id, w, { noBonus: true }); if (r) { added++; points += r.total; } }
   return { status: 200, body: { added, skipped: items.length - added, points } };
 });
 
@@ -326,6 +336,8 @@ async function handle(req, opts) {
   } catch (e) {
     if (e instanceof HttpError) return out(e.status, { error: e.message });
     if (e && e.code === "NO_DB") return out(503, { error: "Сервер данных ещё не подключён" });
+    // Ошибки формата данных от базы (не тот тип, вне диапазона, нарушено ограничение, недопустимый символ) — это неверный запрос, а не сбой сервера.
+    if (e && ["22P02", "22003", "23514", "22021", "22001"].includes(e.code)) return out(400, { error: "Неверные данные" });
     console.error("api error:", e && e.message);
     return out(500, { error: "Ошибка сервера" });
   }

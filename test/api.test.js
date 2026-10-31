@@ -147,10 +147,13 @@ dbtest("перенос истории: старые дни добавляютс�
     { day: "2026-09-01", program: "start", dayId: "d1" },         // старше 30 дней
     { day: "плохо", program: "start", dayId: "d1" }, null, 5,
   ];
+  items.push({ day: "2026-11-05", program: "start", dayId: "d1" }); // 15 дней назад: старше окна в 14 дней
+  items.push({ day: "2026-11-21", program: "start", dayId: "d1" }); // завтра: будущее не переносится
   const r = await c.call("POST", "/api/workouts/sync", { items });
   assert.equal(r.status, 200);
-  assert.deepEqual([r.body.added, r.body.points], [3, 20 + 20 + 25]); // 16-го 20, 17-го 20, 18-го серия 3 → 20 + 5
-  assert.equal((await c.call("POST", "/api/workouts/sync", { items })).body.added, 0);
+  assert.deepEqual([r.body.added, r.body.points], [3, 60]); // без бонусов за серию: история из браузера не подтверждена
+  const again = await c.call("POST", "/api/workouts/sync", { items: [{ day: "2026-11-19", program: "start", dayId: "d1" }] });
+  assert.deepEqual([again.status, again.body.added, again.body.already], [200, 0, true], "перенос истории разрешён один раз");
   assert.equal((await c.call("POST", "/api/workouts/sync", { items: "x" })).status, 400);
   assert.equal((await c.call("POST", "/api/workouts/sync", { items: new Array(61).fill({}) })).status, 400);
 });

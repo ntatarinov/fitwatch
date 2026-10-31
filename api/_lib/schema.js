@@ -147,6 +147,13 @@ const MIGRATIONS = [
       `ALTER TABLE trainer_links ADD COLUMN IF NOT EXISTS trainer_note text CHECK (trainer_note IS NULL OR char_length(trainer_note) <= 1000)`,
     ],
   },
+  {
+    version: 6,
+    name: "browser history can be synced once per account",
+    sql: [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS history_synced_at timestamptz`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

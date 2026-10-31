@@ -33,7 +33,8 @@ function openApp(db, ip) {
   html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + "</script>");
   const errors = [], vc = new VirtualConsole();
   vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0])); vc.on("error", e => errors.push(String(e)));
-  let cookie = "";
+  const jar = {}; // несколько cookie, как в браузере
+  const cookieHeader = () => Object.keys(jar).map(k => k + "=" + jar[k]).join("; ");
   const dom = new JSDOM(html, {
     url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
@@ -45,9 +46,9 @@ function openApp(db, ip) {
         init = init || {};
         const u = new URL(url, "http://localhost"), headers = { host: "localhost", "x-forwarded-for": ip };
         Object.keys(init.headers || {}).forEach(k => { headers[k.toLowerCase()] = init.headers[k]; });
-        if (cookie) headers.cookie = cookie;
+        if (cookieHeader()) headers.cookie = cookieHeader();
         const res = await handle({ method: init.method || "GET", path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body ? JSON.parse(init.body) : undefined, headers }, { db });
-        (res.cookies || []).forEach(sc => { const [k, v] = sc.split(";")[0].split("="); cookie = v === "" ? "" : k + "=" + v; });
+        (res.cookies || []).forEach(sc => { const kv = sc.split(";")[0], i = kv.indexOf("="), k = kv.slice(0, i), v = kv.slice(i + 1); if (v === "" || /Max-Age=0\b/.test(sc)) delete jar[k]; else jar[k] = v; });
         return { ok: res.status < 400, status: res.status, json: async () => res.body };
       };
     },
