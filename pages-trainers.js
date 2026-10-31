@@ -29,7 +29,7 @@
     const r = await acc.subscription();
     if (!r.ok) { app.innerHTML = `<h1>Тарифы</h1><div class="card"><p class="muted">${esc(errText(r))}</p></div>`; return; }
     const cur = r.data.tier, until = r.data.until ? new Date(r.data.until).toLocaleDateString("ru-RU") : "";
-    app.innerHTML = `<h1>Тарифы</h1>${P.ideaChips(["A12", "A13", "K6"])}
+    app.innerHTML = `<h1>Тарифы</h1>${P.ideaChips(["A25", "A26", "K6"])}
       <p class="muted">Сейчас: <b>${esc(TIER[cur])}</b>${until ? ", действует до " + until : ""}.</p>
       ${r.data.tiers.map(t => `<div class="card tier ${t.id === cur ? "cur" : ""}"><div class="row"><b>${esc(t.title)}</b><span class="pill ${t.id === cur ? "done" : ""}">${t.id === cur ? "Ваш тариф" : esc(t.price)}</span></div><ul>${t.features.map(f => `<li>${esc(f)}</li>`).join("")}</ul></div>`).join("")}
       <form id="promo" class="card"><label><b>Промокод</b></label><div class="row" style="gap:8px"><input name="code" placeholder="Например, FW-AB12CD34" maxlength="24" autocomplete="off" style="flex:1"><button type="submit">Применить</button></div>
@@ -98,7 +98,7 @@
         ${personal ? `<div class="row" style="gap:8px"><input data-note="${t.id}" placeholder="Что хотите: цель, ограничения (необязательно)" maxlength="300" style="flex:1"><button data-req="${t.id}" type="button">Запросить</button></div>`
           : `<a class="btn ghost-btn" href="#/tariffs">Нужна подписка «Персональный тренер»</a>`}</div>`).join("") : '<p class="muted">Подтверждённых тренеров пока нет.</p>';
     const coach = prof && prof.status === "approved";
-    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Тренеры</h1>${P.ideaChips(["A6", "K4"])}
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Тренеры</h1>${P.ideaChips(["A7", "K4"])}
       <div class="card warn"><p class="muted" style="margin:0">${DISCLAIMER}</p></div>
       ${coach ? '<a class="btn" href="#/coach">Кабинет тренера</a>' : ""}
       <h2>Мои тренеры</h2>${myLinks}<h2>Выбрать тренера</h2><div class="status" id="terr" role="alert"></div>${trainers}
