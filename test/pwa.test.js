@@ -56,7 +56,7 @@ function loadSw() {
   const handlers = {}, store = new Map(), calls = { added: [], deleted: [], put: [], fetched: [] };
   const caches = {
     open: async name => ({ add: async u => { calls.added.push(name + ":" + u); }, put: async (r, res) => { calls.put.push(r.url); } }),
-    keys: async () => ["old-cache", "fw-0.7.0"],
+    keys: async () => ["old-cache", "fw-" + pkg.version],
     delete: async k => { calls.deleted.push(k); return true; },
     match: async req => store.get(typeof req === "string" ? req : req.url) || null,
   };
