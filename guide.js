@@ -1,25 +1,41 @@
-// Режимы «Простой» и «Pro», приветствие, чек-лист первых шагов и подсказки.
+// Настройка под себя: режим Lite или Pro, что человеку важно (разделы), тема, приветствие, первые шаги и подсказки.
 // Настройки лежат отдельно от прогресса (ключ fitwatch.ui), поэтому «Сбросить прогресс» их не стирает.
 // Без хранилища (приватный режим) всё работает в памяти до закрытия страницы.
 (function (root) {
   "use strict";
   const KEY = "fitwatch.ui";
-  const MODES = ["simple", "pro"];
+  const MODES = ["lite", "pro"];
+  const THEMES = ["auto", "light", "dark"];
   let memory = null;
 
-  const defaults = () => ({ mode: "simple", onboarded: false, tips: {}, stepsHidden: false, installHidden: false });
+  // Разделы, которые человек включает и выключает. Тренировки есть всегда.
+  const MODULES = [
+    { id: "food", icon: "food", title: "Питание", hint: "Калории и БЖУ за день" },
+    { id: "sleep", icon: "moon", title: "Сон и восстановление", hint: "Журнал сна и советы по отдыху" },
+    { id: "progress", icon: "scale", title: "Вес и рост", hint: "История замеров и график" },
+    { id: "rating", icon: "trophy", title: "Рейтинг и соревнования", hint: "Баллы среди других участников" },
+    { id: "trainers", icon: "chat", title: "Тренер и подписки", hint: "Чат с тренером, программы по подписке" },
+  ];
+  const MODULE_IDS = MODULES.map(m => m.id);
+  const LITE_DEFAULT = ["food"];
+
+  const defaults = () => ({ mode: "lite", onboarded: false, tips: {}, stepsHidden: false, installHidden: false, modules: null, theme: "auto" });
+  const cleanModules = m => (Array.isArray(m) ? MODULE_IDS.filter(id => m.includes(id)) : null);
   function read() {
     let raw = null;
     try { raw = root.localStorage.getItem(KEY); } catch (e) { return memory ? Object.assign(defaults(), memory) : defaults(); }
     let p = {};
     try { p = JSON.parse(raw) || {}; } catch (e) { p = {}; }
-    const d = defaults();
+    if (typeof p !== "object" || Array.isArray(p)) p = {};
+    const mode = p.mode === "simple" ? "lite" : p.mode; // прежнее название режима
     return {
-      mode: MODES.includes(p.mode) ? p.mode : d.mode,
+      mode: MODES.includes(mode) ? mode : "lite",
       onboarded: p.onboarded === true,
       tips: p.tips && typeof p.tips === "object" && !Array.isArray(p.tips) ? p.tips : {},
       stepsHidden: p.stepsHidden === true,
       installHidden: p.installHidden === true,
+      modules: cleanModules(p.modules),
+      theme: THEMES.includes(p.theme) ? p.theme : "auto",
     };
   }
   function write(p) {
@@ -28,8 +44,13 @@
   }
   const patch = f => { const p = read(); f(p); write(p); return p; };
 
+  // ---------- подписки на изменения ----------
+  const modeListeners = [], prefListeners = [];
+  const onMode = f => { modeListeners.push(f); };
+  const onPrefs = f => { prefListeners.push(f); };
+  const fire = (list, arg) => list.slice().forEach(f => { try { f(arg); } catch (e) { /* подписчик не должен ломать переключение */ } });
+
   // ---------- режим ----------
-  const listeners = [];
   const mode = () => read().mode;
   const isPro = () => mode() === "pro";
   function setMode(m) {
@@ -37,28 +58,65 @@
     const was = mode();
     patch(p => { p.mode = m; });
     apply();
-    if (was !== m) listeners.slice().forEach(f => { try { f(m); } catch (e) { /* подписчик не должен ломать переключение */ } });
+    if (was !== m) { fire(modeListeners, m); fire(prefListeners, "mode"); }
     return true;
   }
-  const onMode = f => { listeners.push(f); };
-  // Режим живёт на <body>: стили скрывают всё с классом pro-only (простой) или simple-only (Pro).
+
+  // ---------- разделы ----------
+  // Пока человек сам не выбирал: в Lite только питание, в Pro всё (так было до настроек).
+  function modules() {
+    const p = read();
+    return p.modules || (p.mode === "pro" ? MODULE_IDS.slice() : LITE_DEFAULT.slice());
+  }
+  const show = id => modules().includes(id);
+  function setModules(list) {
+    const m = cleanModules(list);
+    if (!m) return false;
+    patch(p => { p.modules = m; });
+    apply();
+    fire(prefListeners, "modules");
+    return true;
+  }
+  function toggleModule(id, on) {
+    if (!MODULE_IDS.includes(id)) return false;
+    const cur = new Set(modules());
+    if (on === undefined ? !cur.has(id) : on) cur.add(id); else cur.delete(id);
+    return setModules([...cur]);
+  }
+
+  // ---------- тема ----------
+  const theme = () => read().theme;
+  function setTheme(t) {
+    if (!THEMES.includes(t)) return false;
+    patch(p => { p.theme = t; });
+    apply();
+    fire(prefListeners, "theme");
+    return true;
+  }
+
+  // Состояние живёт на <html> и <body>: стили скрывают разделы, которые человек отключил, и выбирают тему.
   function apply() {
     const doc = root.document;
     if (!doc || !doc.body) return;
-    doc.body.dataset.mode = mode();
-    doc.querySelectorAll("[data-modebtn]").forEach(b => { b.textContent = isPro() ? "Pro" : "Простой"; b.setAttribute("aria-label", "Режим: " + (isPro() ? "Pro" : "простой") + ". Нажми, чтобы переключить"); });
+    const p = read(), hidden = MODULE_IDS.filter(id => !modules().includes(id));
+    doc.body.dataset.mode = p.mode;
+    doc.body.dataset.hide = hidden.join(" ");
+    if (doc.documentElement) {
+      if (p.theme === "auto") delete doc.documentElement.dataset.theme; else doc.documentElement.dataset.theme = p.theme;
+    }
+    doc.querySelectorAll("[data-modebtn]").forEach(b => { b.textContent = p.mode === "pro" ? "Pro" : "Lite"; b.setAttribute("aria-label", "Режим " + (p.mode === "pro" ? "Pro" : "Lite") + ". Нажми, чтобы переключить"); });
   }
 
   // ---------- первые шаги ----------
-  // ctx: { hasPlan, workouts, foodEntries, loggedIn, nextHref }
+  // ctx: { hasPlan, workouts, foodEntries, loggedIn, nextHref, useFood }. Шаг про еду пропускается, если питание отключено.
   function steps(ctx) {
     const c = ctx || {};
     const list = [
-      { id: "plan", emoji: "🎯", title: "Подбери план", hint: "Ответь на пару вопросов, и получишь тренировки под себя", href: "#/me", done: !!c.hasPlan },
-      { id: "workout", emoji: "💪", title: "Сделай первую тренировку", hint: "Открой день плана и нажми «Я потренировался»", href: c.nextHref || "#/programs", done: (c.workouts || 0) > 0 },
-      { id: "food", emoji: "🍎", title: "Запиши, что съел", hint: "Выбери продукт и граммы: калории и БЖУ посчитаются сами", href: "#/food", done: (c.foodEntries || 0) > 0 },
-      { id: "account", emoji: "☁️", title: "Сохрани прогресс", hint: "Войди через Telegram или почту: данные не потеряются", href: "#/account", done: !!c.loggedIn },
-    ];
+      { id: "plan", icon: "target", title: "Подбери план", hint: "Ответь на пару вопросов, и получишь тренировки под себя", href: "#/me", done: !!c.hasPlan },
+      { id: "workout", icon: "dumbbell", title: "Сделай первую тренировку", hint: "Открой день плана и нажми «Я потренировался»", href: c.nextHref || "#/programs", done: (c.workouts || 0) > 0 },
+      { id: "food", icon: "food", title: "Запиши, что съел", hint: "Выбери продукт и граммы: калории и БЖУ посчитаются сами", href: "#/food", done: (c.foodEntries || 0) > 0 },
+      { id: "account", icon: "cloud", title: "Сохрани прогресс", hint: "Войди через Telegram или почту: данные не потеряются", href: "#/account", done: !!c.loggedIn },
+    ].filter(s => s.id !== "food" || c.useFood !== false);
     const done = list.filter(s => s.done).length;
     const current = list.find(s => !s.done) || null;
     return { list, done, total: list.length, pct: Math.round(done / list.length * 100), current, complete: done === list.length };
@@ -66,42 +124,49 @@
 
   // ---------- подсказки на страницах ----------
   const TIPS = {
-    me: ["🎯", "Ответь честно про ограничения: программа уберёт упражнения, которые тебе не подходят."],
-    plan: ["📅", "Открой день плана и нажми «Я потренировался»: за каждый день баллы, а серия растёт."],
-    library: ["🧍", "Нажми на мышцу на схеме тела, и останутся упражнения именно для неё."],
-    food: ["🍎", "Выбери продукт и граммы: калории и БЖУ посчитаются сами. Массу в записи можно поправить."],
-    sleep: ["😴", "Записывай сон по утрам. Если спал меньше 6 часов, совет дня предложит лёгкий день."],
-    rating: ["🏆", "В рейтинге видны только те, кто сам согласился. Свой доступ включается в Профиле, в разделе «Аккаунт»."],
-    trainers: ["👥", "Запрос тренеру доступен с тарифом «Персональный тренер». Тренер видит твои данные только с твоего согласия."],
-    premium: ["💎", "Расширенные программы рассчитаны на 4–8 недель. Открыть их можно по подписке или промокоду."],
+    me: ["target", "Ответь честно про ограничения: программа уберёт упражнения, которые тебе не подходят."],
+    plan: ["calendar", "Открой день плана и нажми «Я потренировался»: за каждый день баллы, а серия растёт."],
+    library: ["dumbbell", "Нажми на мышцу на схеме тела, и останутся упражнения именно для неё."],
+    food: ["food", "Выбери продукт и граммы: калории и БЖУ посчитаются сами. Массу в записи можно поправить."],
+    sleep: ["moon", "Записывай сон по утрам. Если спал меньше 6 часов, совет дня предложит лёгкий день."],
+    rating: ["trophy", "В рейтинге видны только те, кто сам согласился. Свой доступ включается в Профиле, в разделе «Аккаунт»."],
+    trainers: ["chat", "Запрос тренеру доступен с тарифом «Персональный тренер». Тренер видит твои данные только с твоего согласия."],
+    premium: ["diamond", "Расширенные программы рассчитаны на 4–8 недель. Открыть их можно по подписке или промокоду."],
   };
   const known = id => Object.prototype.hasOwnProperty.call(TIPS, id);
   const tipSeen = id => Object.prototype.hasOwnProperty.call(read().tips, id);
+  const icon = n => (root.Icons ? root.Icons.svg(n, 20) : "");
   // Подсказки нужны новичку: в режиме Pro они скрыты.
   function tip(id) {
     if (!known(id) || isPro() || tipSeen(id)) return "";
     const t = TIPS[id];
-    return `<div class="tip" data-tip="${id}" role="note"><span class="tip-ic" aria-hidden="true">${t[0]}</span><p>${t[1]}</p><button type="button" class="tip-x" data-tip-x="${id}">Понятно</button></div>`;
+    return `<div class="tip" data-tip="${id}" role="note"><span class="tip-ic" aria-hidden="true">${icon(t[0])}</span><p>${t[1]}</p><button type="button" class="tip-x" data-tip-x="${id}">Понятно</button></div>`;
   }
   function dismissTip(id) { if (known(id)) patch(p => { p.tips[id] = true; }); }
   function resetTips() { patch(p => { p.tips = {}; p.stepsHidden = false; p.installHidden = false; }); }
 
   // ---------- приветствие ----------
   const needsOnboarding = () => !read().onboarded;
-  function finishOnboarding(m) { patch(p => { p.onboarded = true; }); if (m) setMode(m); }
+  // modules: список выбранных разделов или не задан (останутся значения по режиму).
+  function finishOnboarding(m, mods) {
+    patch(p => { p.onboarded = true; });
+    if (mods !== undefined) setModules(mods);
+    if (m) setMode(m);
+  }
   const hideSteps = () => patch(p => { p.stepsHidden = true; });
   const stepsHidden = () => read().stepsHidden;
   const hideInstall = () => patch(p => { p.installHidden = true; });
   const installHidden = () => read().installHidden;
 
   const SLIDES = [
-    { id: "hello", title: "Добро пожаловать в FitWatch", text: "Тренировки с видео, питание и мотивация в одном месте. Покажу за полминуты, как всё устроено.",
-      art: `<div class="ob-orb"><span class="ob-float f1">💪</span><span class="ob-float f2">🍎</span><span class="ob-float f3">🔥</span><span class="ob-float f4">🏆</span><b class="ob-logo">FW</b></div>` },
+    { id: "hello", title: "Добро пожаловать в FitWatch", text: "Тренировки с видео, питание и мотивация в одном месте. Покажу за минуту, как всё устроено.",
+      art: `<div class="ob-orb"><span class="ob-float f1">${icon("dumbbell")}</span><span class="ob-float f2">${icon("food")}</span><span class="ob-float f3">${icon("flame")}</span><span class="ob-float f4">${icon("trophy")}</span><b class="ob-logo">FW</b></div>` },
     { id: "goal", title: "Выбери цель, получи план", text: "Ответишь на несколько вопросов о цели, уровне и ограничениях. Приложение соберёт неделю тренировок именно под тебя.",
-      art: `<div class="ob-flow"><span style="--i:0">🎯 Цель</span><span style="--i:1">📶 Уровень</span><span style="--i:2">📆 Дни</span><span style="--i:3" class="ok">✓ Готов план</span></div>` },
+      art: `<div class="ob-flow"><span style="--i:0">Цель</span><span style="--i:1">Уровень</span><span style="--i:2">Дни и время</span><span style="--i:3" class="ok">План готов</span></div>` },
     { id: "train", title: "Тренируйся и отмечай", text: "За каждую тренировку баллы, серия дней и новые уровни. Видео покажет технику, а лёгкий день не сломает серию.",
-      art: `<div class="ob-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="val" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-dasharray="264" stroke-linecap="round"/></svg><div class="ob-num"><b>+20</b><small>баллов</small></div><span class="ob-flame">🔥</span></div>` },
-    { id: "mode", title: "Как тебе удобнее?", text: "Режим можно сменить в любой момент кнопкой вверху.", art: "" },
+      art: `<div class="ob-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="val" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-dasharray="264" stroke-linecap="round"/></svg><div class="ob-num"><b>+20</b><small>баллов</small></div><span class="ob-flame">${icon("flame")}</span></div>` },
+    { id: "interests", title: "Что тебе важно?", text: "Отметь, что нужно. Остальное спрячем, чтобы не мешало. Вернуть можно в Профиле.", art: "" },
+    { id: "mode", title: "Как показывать?", text: "Режим можно сменить в любой момент кнопкой вверху.", art: "" },
   ];
 
   // Окно приветствия. Возвращает управление для тестов; onDone(mode) вызывается один раз.
@@ -114,33 +179,36 @@
     el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "ob-title");
     doc.body.appendChild(el);
     doc.body.classList.add("ob-lock");
+    const picked = new Set(modules().length && read().onboarded ? modules() : ["food"]); // впервые: питание отмечено заранее
     let i = 0, done = false, x0 = null;
     const last = () => i === SLIDES.length - 1;
     const sfx = () => { try { root.FX && root.FX.play("tap"); } catch (e) { /* звук необязателен */ } };
 
-    function finish(m) {
+    function finish(m, mods) {
       if (done) return;
       done = true;
-      finishOnboarding(m);
+      finishOnboarding(m, mods);
       doc.removeEventListener("keydown", onKey);
       if (el.parentNode) el.parentNode.removeChild(el);
       doc.body.classList.remove("ob-lock");
       try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (e) { /* элемента уже нет */ }
       if (o.onDone) o.onDone(m || mode());
     }
+    const interestsHtml = () => `<div class="ob-list" role="group" aria-label="Что тебе важно">
+      <div class="ob-opt on locked" aria-disabled="true"><span class="oi">${icon("dumbbell")}</span><span class="ot"><b>Тренировки</b><small>Планы, упражнения с видео: всегда на месте</small></span><span class="ck">${icon("check")}</span></div>
+      ${MODULES.map(m => `<button type="button" class="ob-opt ${picked.has(m.id) ? "on" : ""}" data-interest="${m.id}" role="checkbox" aria-checked="${picked.has(m.id)}"><span class="oi">${icon(m.icon)}</span><span class="ot"><b>${m.title}</b><small>${m.hint}</small></span><span class="ck">${icon("check")}</span></button>`).join("")}</div>`;
+    const modeHtml = () => `<div class="ob-modes">
+      <button type="button" class="ob-mode" data-pick="lite"><span class="oi">${icon("leaf")}</span><span class="ot"><b>Lite</b><small>Только нужное. Подсказки на страницах и первые шаги</small></span></button>
+      <button type="button" class="ob-mode" data-pick="pro"><span class="oi">${icon("bolt")}</span><span class="ot"><b>Pro</b><small>Без подсказок, больше данных: аналитика, идеи команды, выгрузка</small></span></button></div>`;
     function draw() {
       const s = SLIDES[i];
-      const body = s.id === "mode"
-        ? `<div class="ob-modes">
-            <button type="button" class="ob-mode" data-pick="simple"><span class="em">🌱</span><b>Простой</b><small>Только нужное: план, тренировки, питание. Подсказки и первые шаги</small></button>
-            <button type="button" class="ob-mode" data-pick="pro"><span class="em">⚡</span><b>Pro</b><small>Всё сразу: тренеры, тарифы, рейтинг, аналитика, идеи команды</small></button></div>`
-        : `<div class="ob-art">${s.art}</div>`;
+      const body = s.id === "interests" ? interestsHtml() : s.id === "mode" ? modeHtml() : `<div class="ob-art">${s.art}</div>`;
       el.innerHTML = `<div class="ob-card" key="${s.id}">
         <button type="button" class="ob-skip" data-skip>${last() ? "" : "Пропустить"}</button>
         ${body}
         <h2 id="ob-title">${s.title}</h2><p>${s.text}</p>
         <div class="ob-dots" aria-hidden="true">${SLIDES.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
-        <div class="ob-nav">${i > 0 ? `<button type="button" class="ghost" data-prev>Назад</button>` : "<span></span>"}${last() ? "" : `<button type="button" data-next>${i === SLIDES.length - 2 ? "Далее" : "Дальше"}</button>`}</div>
+        <div class="ob-nav">${i > 0 ? `<button type="button" class="ghost" data-prev>Назад</button>` : "<span></span>"}${last() ? "" : `<button type="button" data-next>Дальше</button>`}</div>
         <div class="ob-step" aria-live="polite">Шаг ${i + 1} из ${SLIDES.length}</div></div>`;
       const first = el.querySelector("[data-next],[data-pick]");
       if (first && first.focus) first.focus();
@@ -151,8 +219,13 @@
       if (!t) return;
       if (t.hasAttribute("data-next")) go(1);
       else if (t.hasAttribute("data-prev")) go(-1);
-      else if (t.hasAttribute("data-skip")) { sfx(); finish("simple"); }
-      else if (t.dataset.pick) { sfx(); try { root.FX && root.FX.confetti(); } catch (e) { /* без анимации */ } finish(t.dataset.pick); }
+      else if (t.hasAttribute("data-skip")) { sfx(); finish("lite"); }
+      else if (t.dataset.interest) {
+        const id = t.dataset.interest, on = !picked.has(id);
+        if (on) picked.add(id); else picked.delete(id);
+        t.classList.toggle("on", on); t.setAttribute("aria-checked", String(on));
+        sfx();
+      } else if (t.dataset.pick) { sfx(); try { root.FX && root.FX.confetti(); } catch (e) { /* без анимации */ } finish(t.dataset.pick, [...picked]); }
     });
     // Свайп на телефоне: влево — дальше, вправо — назад.
     el.addEventListener("touchstart", ev => { x0 = ev.touches && ev.touches[0] ? ev.touches[0].clientX : null; }, { passive: true });
@@ -165,9 +238,9 @@
     function onKey(ev) {
       if (ev.key === "ArrowRight") go(1);
       else if (ev.key === "ArrowLeft") go(-1);
-      else if (ev.key === "Escape") finish("simple");
+      else if (ev.key === "Escape") finish("lite");
       else if (ev.key === "Tab") { // фокус остаётся внутри окна
-        const f = Array.from(el.querySelectorAll("button")).filter(b => b.textContent.trim() || b.dataset.pick);
+        const f = Array.from(el.querySelectorAll("button")).filter(b => b.textContent.trim() || b.dataset.pick || b.dataset.interest);
         if (!f.length) return;
         const a = doc.activeElement, firstB = f[0], lastB = f[f.length - 1];
         if (ev.shiftKey && a === firstB) { ev.preventDefault(); lastB.focus(); }
@@ -176,10 +249,10 @@
     }
     doc.addEventListener("keydown", onKey);
     draw();
-    return { go, finish, get index() { return i; }, get slides() { return SLIDES.length; } };
+    return { go, finish, get index() { return i; }, get slides() { return SLIDES.length; }, get picked() { return [...picked]; } };
   }
 
-  const api = { KEY, MODES, SLIDES, TIPS, mode, isPro, setMode, onMode, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
+  const api = { KEY, MODES, THEMES, MODULES, MODULE_IDS, LITE_DEFAULT, SLIDES, TIPS, mode, isPro, setMode, onMode, onPrefs, modules, show, setModules, toggleModule, theme, setTheme, apply, steps, tip, dismissTip, resetTips, needsOnboarding, finishOnboarding, showOnboarding, hideSteps, stepsHidden, hideInstall, installHidden, read };
   root.Guide = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

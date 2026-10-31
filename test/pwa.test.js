@@ -40,8 +40,11 @@ test("страница подключает манифест, значки и н
   assert.match(h, /rel="apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
   assert.match(h, /apple-mobile-web-app-capable/);
   assert.match(h, /viewport-fit=cover/);
-  const color = (h.match(/name="theme-color" content="(#[0-9a-f]{6})"/i) || [])[1];
-  assert.equal(color, manifest.theme_color);
+  const light = (h.match(/name="theme-color" content="(#[0-9a-f]{6})" media="\(prefers-color-scheme: light\)"/i) || [])[1];
+  const dark = (h.match(/name="theme-color" content="(#[0-9a-f]{6})" media="\(prefers-color-scheme: dark\)"/i) || [])[1];
+  assert.equal(light, manifest.theme_color, "светлый цвет строки браузера совпадает с манифестом");
+  assert.ok(dark && dark !== light, "для тёмной темы свой цвет");
+  assert.ok(h.indexOf('<script src="icons.js">') < h.indexOf('<script src="guide.js">'), "значки грузятся раньше гайдов");
   const order = f => h.indexOf(`<script src="${f}">`);
   assert.ok(order("guide.js") > 0 && order("guide.js") < order("pages.js"));
   assert.ok(order("pwa.js") > 0 && order("pwa.js") < order("app.js"));

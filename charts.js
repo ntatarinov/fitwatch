@@ -21,7 +21,7 @@
     const mid = (lo + hi) / 2;
     const grid = [hi, mid, lo].map(v => '<line class="ch-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '"/><text class="ch-lab" x="' + (L - 4) + '" y="' + (Y(v) + 3).toFixed(1) + '" text-anchor="end">' + (Math.round(v * 10) / 10) + "</text>").join("");
     const xl = '<text class="ch-lab" x="' + L + '" y="' + (H - 8) + '">' + fmt(items[0].day) + '</text>' + (items.length > 1 ? '<text class="ch-lab" x="' + (W - R) + '" y="' + (H - 8) + '" text-anchor="end">' + fmt(items[items.length - 1].day) + "</text>" : "");
-    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="График: ' + items.length + ' замеров"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ee0a4" stop-opacity=".35"/><stop offset="1" stop-color="#3ee0a4" stop-opacity="0"/></linearGradient></defs>' +
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="График: ' + items.length + ' замеров"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".28"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
       grid + (items.length > 1 ? '<path d="' + area + '" fill="url(#cg)"/><polyline class="ch-line" fill="none" points="' + pts.join(" ") + '"/>' : "") + dots + xl + "</svg>";
   }
   const api = { line };

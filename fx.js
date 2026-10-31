@@ -62,7 +62,7 @@
     cv.width = w * dpr; cv.height = h * dpr;
     g.scale(dpr, dpr);
     doc.body.appendChild(cv);
-    const colors = ["#3ee0a4", "#22d3ee", "#8b5cf6", "#f59e0b", "#f472b6", "#ffffff"];
+    const colors = ["#FF6A2B", "#FFB020", "#2F6BFF", "#12B76A", "#F472B6", "#14141A"];
     const parts = Array.from({ length: 150 }, () => {
       const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.9, sp = 7 + Math.random() * 9;
       return { x: w / 2, y: h * 0.62, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: colors[(Math.random() * colors.length) | 0] };

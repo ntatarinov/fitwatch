@@ -84,7 +84,12 @@
       if (!up) X.play("badge");
     }, 700 * (i + (up ? 1 : 0))));
   }
-  function renderBadge() { badge.textContent = "⭐ " + totalPoints() + " · " + state.name; }
+  // Имя пользователя попадает в страницу только как текст.
+  function renderBadge() {
+    badge.innerHTML = '<span class="b-ic"></span><span class="b-tx"></span>';
+    badge.firstChild.innerHTML = window.Icons.svg("star", 16);
+    badge.lastChild.textContent = totalPoints() + " · " + state.name;
+  }
 
   function profileNow() {
     return Engine.computeProfile({
@@ -252,7 +257,7 @@
     const pct = Math.min(100, Math.round(n / goal * 100)), off = Math.round(264 - 264 * pct / 100);
     const dots = window.Achievements.weekDots(workoutDates().map(dayNum), dayNum(today())).map(d => `<div class="dot ${d.done ? "done" : ""} ${d.today ? "today" : ""}"><i>${d.done ? "✓" : ""}</i>${d.label}</div>`).join("");
     return `<div class="card"><div class="week">
-        <div class="ring" role="img" aria-label="Тренировок за неделю: ${n} из ${goal}"><svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ee0a4"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+        <div class="ring" role="img" aria-label="Тренировок за неделю: ${n} из ${goal}"><svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--ring-a)"/><stop offset="1" style="stop-color:var(--ring-b)"/></linearGradient></defs>
           <circle class="trk" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="val" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-dasharray="264" style="stroke-dashoffset:${off};--off:${off}"/></svg>
           <div class="num"><b>${n}/${goal}</b><small>за 7 дней</small></div></div>
         <div style="flex:1"><div class="streak"><span class="flame ${st ? "" : "off"}">🔥</span><span class="n">${st}</span></div><div class="muted">тренировок в серии</div>
@@ -276,12 +281,12 @@
   }
   function sleepCardHtml() {
     const r = sleepToday();
-    return `<a class="card" href="#/sleep"><div class="row"><div><b>😴 Сон</b><div class="muted tiny">${r ? "Сегодня записано: " + r.hours + " ч" : "Запиши, как спал: советы подстроятся"}</div></div><span class="pill">${r ? "Изменить" : "Записать"}</span></div></a>`;
+    return linkRow("#/sleep", "moon", "Сон", r ? "Сегодня записано: " + r.hours + " ч" : "Запиши, как спал: советы подстроятся", r ? "Изменить" : "Записать");
   }
   function planCardHtml() {
     if (!state.me) return `<div class="card"><b>Твоя цель</b><p class="muted">Расскажи о цели, уровне и ограничениях, и я подберу план тренировок.</p><a class="btn" href="#/me">Подобрать план</a></div>`;
     const dates = state.plan ? state.plan.days.length : 0;
-    return `<a class="card" href="${nextDayHref()}"><div class="row"><div><b>Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${dates} дн. в неделю</div></div><span class="pill">Дальше →</span></div></a>`;
+    return linkRow(nextDayHref(), "calendar", "Мой план", esc(labelOf(window.Planner.GOALS, state.me.goal)) + " · " + dates + " дн. в неделю", "Дальше");
   }
   function meCardHtml() {
     if (!state.me) return `<div class="card"><b>Моя цель и параметры</b><p class="muted">Пока не заполнено.</p><a class="btn" href="#/me">Заполнить анкету</a></div>`;
@@ -303,44 +308,58 @@
   // ---------- страницы ----------
   const doneDays = p => p.days.filter(d => state.log.some(l => l.p === p.id && l.d === d.id)).length;
 
+  const ic = (n, s) => window.Icons.svg(n, s);
+  // Строка-ссылка со значком: одинаковый вид для списков на разных страницах.
+  const linkRow = (href, icon, title, sub, pill) => `<a class="card row-link" href="${href}"><span class="oi">${ic(icon, 22)}</span><div class="rl-tx"><b>${title}</b><div class="muted">${sub}</div></div>${pill ? `<span class="pill">${pill}</span>` : `<span class="chev" aria-hidden="true">›</span>`}</a>`;
+
+  // Питание за сегодня: сколько съедено, сколько осталось и БЖУ. Показывается, если питание включено в настройках.
+  function nutritionCardHtml() {
+    const N = window.Nutrition, items = foodToday().map(x => x.f), sum = N.sum(items), tg = N.targets(state.me);
+    const goal = state.kcalGoal || (tg && tg.kcal) || 0;
+    const pct = goal ? Math.min(100, Math.round(sum.kcal / goal * 100)) : 0, left = goal - sum.kcal;
+    const macro = (name, v, t) => `<div class="mc"><small>${name}</small><b>${v}${t ? `<span class="muted"> / ${t}</span>` : ""}</b><div class="bar"><i style="width:${t ? Math.min(100, Math.round(v / t * 100)) : 0}%"></i></div></div>`;
+    return `<a class="card nutri" href="#/food"><div class="row"><b>Питание сегодня</b><span class="muted tiny">${items.length ? items.length + " " + (items.length === 1 ? "запись" : "записей") : "пока пусто"}</span></div>
+      <div class="nut-main"><span class="num">${sum.kcal}</span><span class="muted"> ${goal ? "из " + goal + " ккал" : "ккал"}</span></div>
+      ${goal ? `<div class="bar thick"><i class="${left < 0 ? "over" : ""}" style="width:${pct}%"></i></div><div class="muted tiny">${left >= 0 ? "Осталось " + left + " ккал" : "Больше цели на " + (-left) + " ккал"}</div>` : ""}
+      <div class="macros">${macro("Белки", sum.p, tg && tg.p)}${macro("Жиры", sum.f, tg && tg.f)}${macro("Углеводы", sum.c, tg && tg.c)}</div></a>`;
+  }
   // Данные для чек-листа «Первые шаги»: считаются из прогресса и входа в аккаунт.
   function stepsCtx() {
-    return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref() };
+    return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref(), useFood: window.Guide.show("food") };
   }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
     const head = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
-    if (!window.Guide.isPro()) {
-      // Простой режим: что делать сейчас, неделя и уровень. Остальное за кнопкой Pro.
-      const st = window.Guide.steps(stepsCtx());
-      const steps = window.Guide.stepsHidden() ? "" : PAGES.stepsCard(st, false);
-      const install = !window.Guide.installHidden() && window.Pwa ? window.Pwa.card({ dismissible: true }) : "";
-      // Пока нет плана, ведёт чек-лист: совет дня с отзывом или тренировкой новичка только запутал бы.
-      const advice = state.plan || window.Guide.stepsHidden() ? adviceHtml() : "";
-      app.innerHTML = head + steps + advice + weekCardHtml() + levelCardHtml() + planCardHtml() + install + PAGES.proTeaser();
-      animateBars();
-      return;
-    }
-    app.innerHTML = head +
-      adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + sleepCardHtml() + PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
-      PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") +
-      "</div>";
+    const Gd = window.Guide, pro = Gd.isPro();
+    const st = Gd.steps(stepsCtx());
+    const steps = !pro && !Gd.stepsHidden() ? PAGES.stepsCard(st, false) : "";
+    // Пока нет плана, ведёт чек-лист: совет дня с отзывом или тренировкой новичка только запутал бы.
+    const advice = pro || state.plan || Gd.stepsHidden() ? adviceHtml() : "";
+    const install = !pro && !Gd.installHidden() && window.Pwa ? window.Pwa.card({ dismissible: true }) : "";
+    const food = Gd.show("food") ? nutritionCardHtml() : "";
+    const sleep = Gd.show("sleep") ? sleepCardHtml() : "";
+    const body = Gd.show("progress") ? linkRow("#/body", "scale", "Вес и рост", "История замеров и график", "") : "";
+    const proBlock = pro ? PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
+      PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : install + PAGES.proTeaser();
+    app.innerHTML = head + steps + advice + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
     animateBars();
   }
 
   function programs() {
+    const Gd = window.Guide, tr = Gd.show("trainers");
     const planLink = state.plan
-      ? `<a class="card" href="#/plan"><div class="row"><div><b>📅 Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${state.plan.days.length} дн. в неделю</div></div><span class="pill">Открыть</span></div></a>`
-      : `<a class="card" href="#/me"><div class="row"><div><b>📅 Мой план</b><div class="muted">Подберём тренировки под твою цель</div></div><span class="pill">Подобрать</span></div></a>`;
-    const pro = window.Guide.isPro();
-    const proCards = pro ? `<a class="card" href="#/trainers"><div class="row"><div><b>👥 Тренеры и чат</b><div class="muted">Персональный тренер, переписка, согласие на доступ к данным</div></div><span class="pill">Открыть</span></div></a>` +
-      `<a class="card" href="#/premium"><div class="row"><div><b>💎 Расширенные программы</b><div class="muted">Программы на 4–8 недель по подписке</div></div><span class="pill">Открыть</span></div></a>` +
-      `<a class="card" href="#/trainer"><div class="row"><div><b>💬 Тренер</b><div class="muted">Диалог по правилам: цель, питание, самочувствие</div></div><span class="pill">Открыть</span></div></a>` : "";
-    app.innerHTML = "<h1>Тренировки</h1>" + planLink + proCards +
-      `<a class="card" href="#/library"><div class="row"><div><b>🧍 Каталог упражнений</b><div class="muted">По мышцам, оборудованию и уровню, с моделью тела</div></div><span class="pill">${window.Catalog.EXERCISES.length}</span></div></a>` +
+      ? linkRow("#/plan", "calendar", "Мой план", esc(labelOf(window.Planner.GOALS, state.me.goal)) + " · " + state.plan.days.length + " дн. в неделю", "Открыть")
+      : linkRow("#/me", "target", "Мой план", "Подберём тренировки под твою цель", "Подобрать");
+    const trainerCards = tr
+      ? linkRow("#/trainers", "chat", "Тренеры и чат", "Персональный тренер, переписка, согласие на доступ к данным", "Открыть") +
+        linkRow("#/premium", "diamond", "Расширенные программы", "Программы на 4–8 недель по подписке", "Открыть") +
+        linkRow("#/trainer", "help", "Тренер по правилам", "Диалог: цель, питание, самочувствие", "Открыть")
+      : "";
+    app.innerHTML = "<h1>Тренировки</h1>" + planLink + trainerCards +
+      linkRow("#/library", "dumbbell", "Каталог упражнений", "По мышцам, оборудованию и уровню, с моделью тела", String(window.Catalog.EXERCISES.length)) +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
       `<a class="card" href="#/p/${p.id}"><div class="row"><div><b>${p.icon || ""} ${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
-        <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("") + (pro ? "" : PAGES.proTeaser());
+        <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("") + (Gd.isPro() ? "" : PAGES.proTeaser());
   }
 
   // --- тренер: чат по правилам, без ИИ ---
@@ -535,7 +554,7 @@
     const pro = window.Guide.isPro();
     const installCard = window.Pwa ? window.Pwa.card() : "";
     app.innerHTML = `<h1>Профиль</h1>
-      <div class="card"><div class="row"><b>Режим</b><a class="pill" href="#/guide">Как пользоваться</a></div>${PAGES.modeSwitch()}</div>
+      ${PAGES.settingsCard()}
       ${installCard}
       ${PAGES.accountCard(FW)}
       ${pro ? PAGES.ideasCard() : ""}
@@ -587,7 +606,7 @@
   }
 
   // ---------- роутер ----------
-  function route() {
+  function route(keepScroll) {
     if (PAGES._cleanup) PAGES._cleanup(); // остановить опрос чата и подобное
     app.classList.remove("enter"); void app.offsetWidth; app.classList.add("enter");
     stopPlayer();
@@ -624,14 +643,14 @@
     else home();
     const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "programs", client: "programs", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
-    window.scrollTo(0, 0);
+    if (keepScroll !== true) window.scrollTo(0, 0);
   }
   // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
   const PAGES = window.PAGES;
   PAGES.stepsCtx = stepsCtx;
   const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
   const snd = document.getElementById("snd");
-  const paintSnd = () => { const on = window.FX.enabled(); snd.textContent = on ? "🔊" : "🔇"; snd.setAttribute("aria-pressed", String(on)); snd.title = on ? "Звук включён" : "Звук выключен"; };
+  const paintSnd = () => { const on = window.FX.enabled(); snd.innerHTML = window.Icons.svg(on ? "volume" : "mute", 20); snd.setAttribute("aria-pressed", String(on)); snd.title = on ? "Звук включён" : "Звук выключен"; };
   snd.onclick = () => { window.FX.setEnabled(!window.FX.enabled()); paintSnd(); window.FX.play("tap"); };
   paintSnd();
   window.addEventListener("hashchange", route);
@@ -640,9 +659,11 @@
   window.Account.refresh();
   renderBadge();
   // Режим и гайды: переключение перерисовывает страницу; приветствие показывается один раз.
-  const guideToast = m => window.FX.toast(m === "pro" ? "Режим Pro: показаны все функции" : "Простой режим: только самое нужное", m === "pro" ? "⚡" : "🌱");
-  PAGES.bindGuide({ rerender: route });
-  window.Guide.onMode(m => { route(); guideToast(m); });
+  const guideToast = m => window.FX.toast(m === "pro" ? "Режим Pro: подсказки скрыты, больше данных" : "Режим Lite: только нужное, с подсказками");
+  PAGES.bindGuide({ rerender: () => route(true) });
+  window.Guide.onMode(guideToast);
+  window.Guide.onPrefs(() => route(true)); // настройки меняют страницу на месте, прокрутка остаётся
+  window.Icons.fill(document);
   window.Guide.apply();
   if (window.Pwa) { window.Pwa.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "guide"].includes(a)) route(); }); window.Pwa.init(); }
   route();

@@ -1,4 +1,4 @@
-// Рисует иконки приложения (PNG) без внешних библиотек: кольцо активности и гантель на тёмном фоне.
+// Рисует иконки приложения (PNG) без внешних библиотек: кольцо активности и гантель на оранжевом фоне.
 // Запуск: node scripts/make-icons.js. Результат лежит в icons/ и закоммичен; скрипт нужен, чтобы пересобрать иконки.
 const fs = require("fs"), path = require("path"), zlib = require("zlib");
 const OUT = path.join(__dirname, "..", "icons");
@@ -25,7 +25,7 @@ function png(size, pixel) {
 }
 
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
-const BG1 = [10, 14, 19], BG2 = [18, 58, 58], ACC = [62, 224, 164], ACC2 = [34, 211, 238], TRK = [255, 255, 255];
+const BG1 = [255, 128, 66], BG2 = [208, 56, 6], ACC = [255, 255, 255], ACC2 = [255, 255, 255], TRK = [255, 255, 255];
 const inRound = (x, y, x0, y0, x1, y1, r) => {
   if (x < x0 || x > x1 || y < y0 || y > y1) return false;
   const cx = Math.min(Math.max(x, x0 + r), x1 - r), cy = Math.min(Math.max(y, y0 + r), y1 - r);
@@ -36,22 +36,20 @@ const inRound = (x, y, x0, y0, x1, y1, r) => {
 function sample(x, y, rounded) {
   if (rounded && !inRound(x, y, 0, 0, 1, 1, 0.22)) return [0, 0, 0, 0];
   // Ярче, если выше и левее — мягкое свечение.
-  let c = mix(BG1, BG2, Math.min(1, (x + y) / 1.6));
-  const glow = Math.max(0, 1 - Math.hypot(x - 0.25, y - 0.2) / 0.6);
-  c = mix(c, [40, 120, 110], glow * 0.35);
+  let c = mix(BG1, BG2, Math.min(1, (x + y) / 1.7));
   const dx = x - 0.5, dy = y - 0.5, d = Math.hypot(dx, dy);
   const R = 0.32, W = 0.075;
   if (Math.abs(d - R) <= W / 2) {
     let ang = Math.atan2(dy, dx) + Math.PI / 2; // 0 сверху, по часовой
     if (ang < 0) ang += Math.PI * 2;
     if (ang / (Math.PI * 2) <= 0.78) c = mix(ACC, ACC2, (x + y) / 2);
-    else c = mix(c, TRK, 0.14);
+    else c = mix(c, TRK, 0.26);
   }
   // Гантель в центре: гриф и по две пластины с каждой стороны.
   const bar = inRound(x, y, 0.36, 0.485, 0.64, 0.515, 0.015);
   const plates = [[0.385, 0.42, 0.415, 0.58], [0.585, 0.42, 0.615, 0.58], [0.345, 0.45, 0.375, 0.55], [0.625, 0.45, 0.655, 0.55]]
     .some(p => inRound(x, y, p[0], p[1], p[2], p[3], 0.012));
-  if (bar || plates) c = [244, 249, 252];
+  if (bar || plates) c = [255, 255, 255];
   return [c[0], c[1], c[2], 255];
 }
 function icon(size, rounded) {

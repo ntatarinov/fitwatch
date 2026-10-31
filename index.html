@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#060a11">
+  <meta name="theme-color" content="#F4F3F0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0C0C0F" media="(prefers-color-scheme: dark)">
   <meta name="description" content="Тренировки с видео, питание с БЖУ, баллы, серия и тренеры в одном приложении.">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
@@ -17,19 +18,19 @@
 </head>
 <body>
   <header class="top">
-    <a class="logo" href="#/">FitWatch</a>
+    <a class="logo" href="#/" aria-label="FitWatch, на главную">Fit<b>Watch</b></a>
     <a class="badge" href="#/profile" id="badge"></a>
     <button class="mode-chip" data-modebtn type="button"></button>
-    <a class="icon-btn help" href="#/guide" aria-label="Как пользоваться" title="Как пользоваться">?</a>
-    <button class="icon-btn" id="snd" type="button" aria-label="Звук" aria-pressed="true">🔊</button>
+    <a class="icon-btn help" href="#/guide" aria-label="Как пользоваться" title="Как пользоваться" data-ic="help" data-size="20"></a>
+    <button class="icon-btn" id="snd" type="button" aria-label="Звук" aria-pressed="true"></button>
   </header>
   <main id="app"></main>
   <nav class="tabbar" id="tabbar">
-    <a href="#/" data-t="home"><span>🏠</span>Главная</a>
-    <a href="#/programs" data-t="programs"><span>🏋️</span>Тренировки</a>
-    <a href="#/food" data-t="food"><span>🍎</span>Питание</a>
-    <a href="#/rating" data-t="rating" class="pro-only"><span>🏆</span>Рейтинг</a>
-    <a href="#/profile" data-t="profile"><span>👤</span>Профиль</a>
+    <a href="#/" data-t="home"><span data-ic="home"></span>Главная</a>
+    <a href="#/programs" data-t="programs"><span data-ic="dumbbell"></span>Тренировки</a>
+    <a href="#/food" data-t="food" data-mod="food"><span data-ic="food"></span>Питание</a>
+    <a href="#/rating" data-t="rating" data-mod="rating"><span data-ic="trophy"></span>Рейтинг</a>
+    <a href="#/profile" data-t="profile"><span data-ic="user"></span>Профиль</a>
   </nav>
   <script src="data.js"></script>
   <script src="catalog.js"></script>
@@ -38,6 +39,7 @@
   <script src="body.js"></script>
   <script src="ideas.js"></script>
   <script src="achievements.js"></script>
+  <script src="icons.js"></script>
   <script src="fx.js"></script>
   <script src="engine.js"></script>
   <script src="tree.js"></script>

@@ -201,7 +201,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   await go(w, "#/checkin");
   await go(w, "#/");
   ok(/Сегодня мягко: мало сна|Ты спал меньше 6 часов|уже засчитана|Сегодня всё сделано/.test(text(w, ".hero")), "совет дня учитывает недосып (или тренировка уже была)");
-  ok(/😴 Сон/.test(text(w, "main")), "на главной есть карточка сна");
+  ok(!!$(w, 'a.card[href="#/sleep"]') && /Сон/.test(text(w, 'a.card[href="#/sleep"]')), "на главной есть карточка сна");
 
   // 8. старые маршруты работают
   for (const h of ["#/programs", "#/p/start", "#/d/start/d1", "#/e/start/squat", "#/trainer", "#/checkin", "#/plan"]) {
