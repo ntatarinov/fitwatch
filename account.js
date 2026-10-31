@@ -3,6 +3,7 @@
   "use strict";
   const state = { status: "unknown", user: null, profile: null, stats: null }; // unknown | anon | user | offline
   const listeners = [];
+  let cfgPromise = null;
   const notify = () => listeners.forEach(f => { try { f(state); } catch (e) { /* подписчик не должен ломать остальных */ } });
 
   async function api(method, path, body) {
@@ -58,12 +59,15 @@
   const A = {
     state, api, refresh, profileFromLocal, workoutsFromLog,
     onChange: f => listeners.push(f),
+    // настройки (имя бота), вход и привязка Telegram
+    config: () => (cfgPromise || (cfgPromise = api("GET", "/api/config").then(r => (r.ok ? r.data : { telegramEnabled: false, telegramBot: null })))),
+    telegramLogin: data => api("POST", "/api/auth/telegram", data),
     register: (email, password, name) => ok(api("POST", "/api/auth/register", { email, password, name })),
     login: (email, password) => ok(api("POST", "/api/auth/login", { email, password })),
     logout: () => ok(api("POST", "/api/auth/logout", {})),
     setRating: v => ok(api("PATCH", "/api/me", { ratingOptIn: !!v })),
     saveProfile: p => api("PATCH", "/api/me", { profile: p }),
-    deleteAccount: password => ok(api("DELETE", "/api/me", { password })),
+    deleteAccount: (password, confirm) => ok(api("DELETE", "/api/me", confirm ? { confirm } : { password })),
     measurements: kind => api("GET", "/api/measurements?kind=" + kind),
     addMeasurement: (kind, value, day) => api("POST", "/api/measurements", day ? { kind, value, day } : { kind, value }),
     deleteMeasurement: id => api("DELETE", "/api/measurements/" + id),

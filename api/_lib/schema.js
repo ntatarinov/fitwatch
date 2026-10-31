@@ -118,6 +118,20 @@ const MIGRATIONS = [
        )`,
     ],
   },
+  {
+    version: 3,
+    name: "telegram login: email and password become optional",
+    sql: [
+      `ALTER TABLE users ALTER COLUMN email DROP NOT NULL`,
+      `ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id bigint`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_username text`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS users_telegram_id ON users(telegram_id) WHERE telegram_id IS NOT NULL`,
+      `DO $$ BEGIN
+         ALTER TABLE users ADD CONSTRAINT users_has_login CHECK (email IS NOT NULL OR telegram_id IS NOT NULL);
+       EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

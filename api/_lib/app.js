@@ -53,15 +53,18 @@ async function userFromCookie(db, cookies) {
   const t = cookies[S.COOKIE];
   if (!t) return null;
   const rows = await db.query(
-    `SELECT u.id, u.email, u.display_name, u.role, u.rating_opt_in FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.token_hash = $1 AND s.expires_at > now()`, [S.tokenHash(t)]);
+    `SELECT u.id, u.email, u.display_name, u.role, u.rating_opt_in, u.telegram_id, u.telegram_username, (u.password_hash IS NOT NULL) AS has_password
+     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now()`, [S.tokenHash(t)]);
   if (!rows.length) return null;
   const u = rows[0];
-  return { id: u.id, email: u.email, name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in };
+  return { id: u.id, email: u.email, name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in,
+    telegramId: u.telegram_id == null ? null : String(u.telegram_id), telegramUsername: u.telegram_username || null, hasPassword: !!u.has_password };
 }
 const adminList = () => String(process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
-const isAdmin = u => !!u && adminList().includes(String(u.email).toLowerCase());
-const publicUser = u => ({ email: u.email, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u) });
+const adminTg = () => String(process.env.ADMIN_TELEGRAM_IDS || "").split(",").map(x => x.trim()).filter(Boolean);
+const isAdmin = u => !!u && !!((u.email && adminList().includes(String(u.email).toLowerCase())) || (u.telegramId && adminTg().includes(String(u.telegramId))));
+const publicUser = u => ({ email: u.email || null, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u),
+  telegram: u.telegramId ? { linked: true, username: u.telegramUsername } : { linked: false }, hasPassword: !!u.hasPassword });
 
 // Тариф человека: free, premium или personal; действует до даты until.
 const TIER_RANK = { free: 0, premium: 1, personal: 2 };
@@ -177,8 +180,10 @@ route("PATCH", "/api/me", async ctx => {
 
 route("DELETE", "/api/me", async ctx => {
   const u = needUser(ctx), { db, body } = ctx;
-  const rows = await db.query("SELECT password_hash FROM users WHERE id = $1", [u.id]);
-  if (!(await S.verifyPassword(typeof body.password === "string" ? body.password : "", rows[0].password_hash))) throw new HttpError(403, "Неверный пароль");
+  if (u.hasPassword) {
+    const rows = await db.query("SELECT password_hash FROM users WHERE id = $1", [u.id]);
+    if (!(await S.verifyPassword(typeof body.password === "string" ? body.password : "", rows[0].password_hash))) throw new HttpError(403, "Неверный пароль");
+  } else if (body.confirm !== "DELETE") throw new HttpError(403, "Подтвердите удаление");
   await db.query("DELETE FROM users WHERE id = $1", [u.id]); // сессии, профиль, замеры и тренировки удаляются каскадом
   return { status: 200, body: { ok: true }, cookies: [S.clearCookie({ secure: ctx.secure })] };
 });
@@ -283,7 +288,8 @@ route("GET", "/api/leaderboard", async ctx => {
 });
 
 // ---- тарифы и тренеры (отдельные модули, общий набор помощников) ----
-const kit = { route, HttpError, bad, needUser, V, S, tierOf, TIER_RANK, isAdmin };
+const kit = { route, HttpError, bad, needUser, V, S, tierOf, TIER_RANK, isAdmin, createSession, tooMany, noteAttempt };
+require("./telegram").install(kit);
 require("./subscriptions").install(kit);
 require("./trainers").install(kit);
 

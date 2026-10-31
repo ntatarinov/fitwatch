@@ -20,6 +20,25 @@
     if (added) window.FX.toast("Перенесено тренировок: " + added, "☁️");
   }
 
+  // Кнопка Telegram: настройки берутся с сервера; если бот не настроен, блок не показывается.
+  async function mountTelegram(FW, box, mode) {
+    const acc = A(), cfg = await acc.config();
+    if (!cfg.telegramEnabled || !cfg.telegramBot || !box.isConnected) { if (box.parentNode) box.parentNode.removeChild(box); return; }
+    window.__fwTg = async user => {
+      const r = await acc.telegramLogin(user);
+      if (!r.ok) { window.FX.toast(r.error === "offline" ? "Сервер недоступен" : r.error, "⚠️"); return; }
+      await acc.refresh();
+      if (mode === "link") { window.FX.toast("Telegram привязан", "✓"); P.account(FW); return; }
+      await afterAuth(FW);
+      FW.go("#/rating");
+    };
+    const sc = document.createElement("script");
+    sc.async = true; sc.src = "https://telegram.org/js/telegram-widget.js?22";
+    sc.setAttribute("data-telegram-login", cfg.telegramBot); sc.setAttribute("data-size", "large"); sc.setAttribute("data-userpic", "false");
+    sc.setAttribute("data-request-access", "write"); sc.setAttribute("data-onauth", "__fwTg(user)");
+    box.appendChild(sc);
+  }
+
   P.accountCard = function (FW) {
     const s = A().state, esc = FW.esc;
     if (s.status === "user") {
@@ -37,24 +56,29 @@
     if (s.status === "offline") { app.innerHTML = "<h1>Аккаунт</h1>" + offlineCard; return; }
     if (s.status === "user") {
       app.innerHTML = `<h1>Аккаунт</h1>
-        <div class="card"><div class="row"><div><b>${esc(s.user.name)}</b><div class="muted">${esc(s.user.email)}</div></div><button class="ghost" id="logout" type="button">Выйти</button></div>
+        <div class="card"><div class="row"><div><b>${esc(s.user.name)}</b><div class="muted">${s.user.email ? esc(s.user.email) : "Вход через Telegram"}${s.user.telegram.linked ? " · Telegram" + (s.user.telegram.username ? " @" + esc(s.user.telegram.username) : " привязан") : ""}</div></div><button class="ghost" id="logout" type="button">Выйти</button></div>
           <label class="chk"><input type="checkbox" id="optin" ${s.user.ratingOptIn ? "checked" : ""}> Участвовать в рейтинге: другие увидят моё имя и очки (вес и рост не показываются)</label></div>
+        ${s.user.telegram.linked ? "" : '<div class="card" id="tgbox"><b>Привязать Telegram</b><p class="muted tiny">Тогда можно входить одной кнопкой и получать сообщения от бота.</p></div>'}
         <div class="stats"><div class="card stat"><div class="big">${s.stats.points}</div><div class="muted">очков</div></div><div class="card stat"><div class="big">${s.stats.streak}</div><div class="muted">серия</div></div></div>
         <div class="row" style="gap:8px"><a class="btn" href="#/rating">Рейтинг</a><a class="btn ghost-btn" href="#/body">Мои данные</a></div>
         <div class="card"><b>Конфиденциальность</b><p class="muted">Имя и очки видны в рейтинге, только если вы включили участие. Вес, рост и самочувствие видны только вам. Удаление аккаунта стирает всё с сервера.</p>
           <button class="ghost" id="delacc" type="button">Удалить аккаунт</button></div>`;
+      const tgb = document.getElementById("tgbox");
+      if (tgb) mountTelegram(FW, tgb, "link");
       document.getElementById("logout").onclick = async () => { await acc.logout(); FW.go("#/"); P.account(FW); };
       document.getElementById("optin").onchange = async ev => { const r = await acc.setRating(ev.target.checked); if (!r.ok) { ev.target.checked = !ev.target.checked; window.FX.toast(r.error || "Не удалось сохранить", "⚠️"); } else window.FX.toast(ev.target.checked ? "Вы участвуете в рейтинге" : "Вы скрыты из рейтинга", "✓"); };
       document.getElementById("delacc").onclick = async () => {
-        const pw = window.prompt("Чтобы удалить аккаунт и все данные на сервере, введите пароль");
-        if (!pw) return;
-        const r = await acc.deleteAccount(pw);
+        const noPw = !s.user.hasPassword;
+        const pw = window.prompt(noPw ? "Чтобы удалить аккаунт и все данные на сервере, напишите УДАЛИТЬ" : "Чтобы удалить аккаунт и все данные на сервере, введите пароль");
+        if (!pw || (noPw && pw.trim().toUpperCase() !== "УДАЛИТЬ")) return;
+        const r = await acc.deleteAccount(noPw ? "" : pw, noPw ? "DELETE" : "");
         if (r.ok) { window.FX.toast("Аккаунт удалён", "🗑️"); FW.go("#/"); P.account(FW); } else window.FX.toast(r.error || "Не удалось удалить", "⚠️");
       };
       return;
     }
     const reg = tab === "register";
     app.innerHTML = `<h1>${reg ? "Регистрация" : "Вход"}</h1>
+      <div class="card" id="tgbox"><b>Войти через Telegram</b><p class="muted tiny">Без пароля и почты: одна кнопка. Нажимая её, вы соглашаетесь на хранение данных на сервере для истории и рейтинга; в рейтинге только имя и очки, и только если вы включите участие.</p></div>
       <div class="chips"><a class="pill ${reg ? "" : "done"}" href="#/account/login">Вход</a><a class="pill ${reg ? "done" : ""}" href="#/account/register">Регистрация</a></div>
       <form id="acform" class="card" novalidate>
         ${reg ? `<label><b>Имя в рейтинге</b></label><input name="name" maxlength="30" autocomplete="nickname" value="${esc(FW.state.name === "Гость" ? "" : FW.state.name)}" style="width:100%">` : ""}
@@ -66,6 +90,7 @@
         <button class="wide" type="submit">${reg ? "Создать аккаунт" : "Войти"}</button>
       </form>
       <p class="muted tiny">Без входа приложение тоже работает: данные лежат на этом устройстве.</p>`;
+    mountTelegram(FW, document.getElementById("tgbox"), "login");
     document.getElementById("acform").onsubmit = async ev => {
       ev.preventDefault();
       const f = ev.target.elements, err = document.getElementById("acerr"), btn = ev.target.querySelector("button[type=submit]");

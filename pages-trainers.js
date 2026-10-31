@@ -192,7 +192,7 @@
     if (!acc.state.user.isAdmin) { app.innerHTML = '<h1>Администратор</h1><div class="card"><p class="muted">Нет доступа.</p></div>'; return; }
     const [tr, pr] = await Promise.all([acc.adminTrainers("pending"), acc.adminPromoList()]);
     app.innerHTML = `<h1>Администратор</h1>
-      <h2>Заявки тренеров (${tr.ok ? tr.data.items.length : 0})</h2>${tr.ok && tr.data.items.length ? tr.data.items.map(t => `<div class="card"><b>${esc(t.name)}</b> <span class="muted tiny">${esc(t.email)}</span><p>${esc(t.bio)}</p><p class="muted tiny">${esc(t.specialties)}</p>
+      <h2>Заявки тренеров (${tr.ok ? tr.data.items.length : 0})</h2>${tr.ok && tr.data.items.length ? tr.data.items.map(t => `<div class="card"><b>${esc(t.name)}</b> <span class="muted tiny">${esc(t.email || "вход через Telegram")}</span><p>${esc(t.bio)}</p><p class="muted tiny">${esc(t.specialties)}</p>
         <button data-v="approve" data-id="${t.id}" type="button">Подтвердить</button> <button class="ghost" data-v="reject" data-id="${t.id}" type="button">Отклонить</button></div>`).join("") : '<p class="muted">Нет новых заявок.</p>'}
       <h2>Промокоды</h2><form id="pform" class="card"><div class="row" style="gap:8px"><select name="tier"><option value="premium">Премиум</option><option value="personal">Персональный тренер</option></select>
         <input name="days" type="number" min="1" max="366" value="30" style="width:90px" aria-label="Дней"><input name="max" type="number" min="1" max="1000" value="1" style="width:90px" aria-label="Использований"></div>
