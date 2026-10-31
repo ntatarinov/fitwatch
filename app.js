@@ -142,6 +142,11 @@
     if (trainedToday()) return false;
     state.log.push({ date: today(), p: p.id, d: d.id, points: dayPoints(d), t: d.title });
     save();
+    // Если человек вошёл в аккаунт, тренировка записывается и на сервер: оттуда очки и бонусы для рейтинга.
+    window.Account.recordWorkout({ day: today(), program: p.id, dayId: d.id, title: d.title }).then(r => {
+      if (r.ok && r.data.bonus) window.FX.toast("Бонус за серию: +" + r.data.bonus + " очков", "🔥");
+      if (r.ok) window.Account.refresh();
+    });
     return true;
   }
 
@@ -287,7 +292,7 @@
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
     app.innerHTML = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>` +
-      adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + "<h2>Программы</h2><div class='tiles'>" +
+      adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") +
       "</div>";
     animateBars();
@@ -298,6 +303,7 @@
       ? `<a class="card" href="#/plan"><div class="row"><div><b>📅 Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${state.plan.days.length} дн. в неделю</div></div><span class="pill">Открыть</span></div></a>`
       : `<a class="card" href="#/me"><div class="row"><div><b>📅 Мой план</b><div class="muted">Подберём тренировки под твою цель</div></div><span class="pill">Подобрать</span></div></a>`;
     app.innerHTML = "<h1>Тренировки</h1>" + planLink +
+      `<a class="card" href="#/trainer"><div class="row"><div><b>💬 Тренер</b><div class="muted">Диалог по правилам: цель, питание, самочувствие</div></div><span class="pill">Открыть</span></div></a>` +
       `<a class="card" href="#/library"><div class="row"><div><b>🧍 Каталог упражнений</b><div class="muted">По мышцам, оборудованию и уровню, с моделью тела</div></div><span class="pill">${window.Catalog.EXERCISES.length}</span></div></a>` +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
       `<a class="card" href="#/p/${p.id}"><div class="row"><div><b>${p.icon || ""} ${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
@@ -493,6 +499,8 @@
       return `<li>${esc(l.date)} · ${esc(p ? p.title : l.p)} · ${esc(d ? d.title : l.d)} · +${l.points}</li>`;
     }).join("");
     app.innerHTML = `<h1>Профиль</h1>
+      ${PAGES.accountCard(FW)}
+      ${PAGES.ideasCard()}
       <div class="card"><div class="muted">Баллы</div><div class="big">${totalPoints()}</div></div>
       ${statsHtml()}
       ${badgesHtml()}
@@ -552,13 +560,17 @@
     else if (a === "pd") PAGES.planDay(FW, b);
     else if (a === "library") PAGES.library(FW, b);
     else if (a === "x") PAGES.exercise(FW, b);
+    else if (a === "ideas") PAGES.ideas(FW, b);
+    else if (a === "account") PAGES.account(FW, b);
+    else if (a === "rating") PAGES.rating(FW, b);
+    else if (a === "body") PAGES.body(FW, b);
     else if (a === "checkin") checkin();
     else if (a === "food") food();
     else if (a === "profile") profile();
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "trainer", checkin: "trainer", profile: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     window.scrollTo(0, 0);
   }
@@ -570,6 +582,9 @@
   snd.onclick = () => { window.FX.setEnabled(!window.FX.enabled()); paintSnd(); window.FX.play("tap"); };
   paintSnd();
   window.addEventListener("hashchange", route);
+  // Изменился вход/выход: обновляем страницы, где виден аккаунт. Без сервера приложение работает как раньше.
+  window.Account.onChange(() => { const a = location.hash.split("/")[1] || ""; if (["", "profile", "account", "rating", "body"].includes(a)) route(); });
+  window.Account.refresh();
   renderBadge();
   route();
 })();

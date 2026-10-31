@@ -76,6 +76,7 @@
         <span class="pill ${t ? "done" : ""}">${t ? "✓ ×" + t : "+" + window.DAY_POINTS}</span></div></a>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Мой план</h1>
+      ${P.ideaChips(["A4", "A7"])}
       <p class="muted">${esc(lab(PL.GOALS, p.goal))} · ${p.days} дн. в неделю по ${p.minutes} мин · ${esc(lab(PL.PLACES, p.place))} · ${esc(lab(C.LEVELS, p.level))}</p>
       ${plan.warnings.length ? `<div class="card warn"><b>Важно</b><ul>${plan.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
       ${days}
@@ -109,6 +110,7 @@
     const myLimits = (st.me && st.me.limits) || [];
     const sel = (id, list, cur, all) => `<select id="${id}" aria-label="${esc(all)}"><option value="">${esc(all)}</option>${list.map(o => `<option value="${o.id}" ${String(cur) === String(o.id) ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Каталог упражнений</h1>
+      ${P.ideaChips(["A1", "A2", "A3"])}
       <p class="muted" id="libcount"></p>
       <div class="card"><b>Выбери мышцу</b><p class="muted">Нажми на мышцу на схеме, и ниже останутся упражнения для неё. Схема упрощённая.</p>
         <div class="body-wrap" id="bodywrap"></div>
@@ -170,7 +172,7 @@
     const bar = (v, max) => `<div class="bar" style="margin-top:4px"><i style="width:${max ? Math.min(100, v / max * 100) : 0}%"></i></div>`;
     const macro = (name, v, max) => `<div style="margin-top:8px"><div class="row"><span>${name}</span><span><b>${v}</b>${max ? " из " + max + " г" : " г"}</span></div>${max ? bar(v, max) : ""}</div>`;
 
-    app.innerHTML = `<h1>Питание</h1><p class="muted">Значения ориентировочные, из справочных таблиц. Это дневник, а не диета и не медицинская рекомендация.</p>
+    app.innerHTML = `<h1>Питание</h1>${P.ideaChips(["A8", "B4"])}<p class="muted">Значения ориентировочные, из справочных таблиц. Это дневник, а не диета и не медицинская рекомендация.</p>
       <div class="card"><div class="row"><div><div class="big">${sum.kcal}</div><div class="muted">ккал из ${goal}</div></div>
         <div style="text-align:right"><label class="muted">Цель, ккал</label><br><input id="goal" type="number" min="800" max="6000" step="50" value="${goal}" style="width:100px"></div></div>
         ${bar(sum.kcal, goal)}
@@ -297,4 +299,50 @@
       stat.textContent = "Не удалось распознать (" + (e && e.message ? e.message : "ошибка") + "). Нужен интернет для загрузки модели. Выбери блюдо вручную выше.";
     }
   }
+  // ---------- идеи команды: кто что предложил и что сделано ----------
+  const ST_CLASS = { ready: "ready", partial: "partial", planned: "planned", later: "later" };
+  const ideasUi = { who: "", status: "" };
+  P.ideaChips = function (ids) {
+    const I = window.Ideas;
+    const chips = ids.map(id => I.byId(id)).filter(Boolean).map(i => `<a class="idea-chip" href="#/ideas/${i.id}">💡 Идея ${i.who === "sanya" ? "Сани" : "Айдархана"}: ${i.chip}</a>`).join("");
+    return chips ? `<div class="idea-row">${chips}</div>` : "";
+  };
+  P.ideasCard = function () {
+    const I = window.Ideas, s = I.summary(I.forWho("sanya")), a = I.summary(I.forWho("aidarkhan"));
+    return `<a class="card" href="#/ideas"><div class="row"><div><b>💡 Идеи команды</b><div class="muted tiny">Саня: ${s.pct}% · Айдархан: ${a.pct}% реализовано</div></div><span class="pill">Открыть</span></div></a>`;
+  };
+  P.ideas = function (FW, arg) {
+    const I = window.Ideas, esc = FW.esc;
+    let focus = null;
+    if (arg === "sanya" || arg === "aidarkhan") ideasUi.who = arg;
+    else if (arg && I.byId(arg)) { focus = arg; ideasUi.who = ""; ideasUi.status = ""; }
+    const card = i => `<div class="card idea st-${ST_CLASS[i.status]} ${focus === i.id ? "hl" : ""}" id="idea-${i.id}">
+      <div class="row"><div><span class="who">${esc(I.PEOPLE.find(p => p.id === i.who).name)}</span> <span class="st ${i.status}">${I.STATUS_LABEL[i.status]}</span></div><span class="muted tiny">${i.id}</span></div>
+      <b>${esc(i.title)}</b>
+      ${i.done ? `<p>✅ Сделано: ${esc(i.done)}</p>` : ""}
+      <p class="muted">Чего не хватает: ${esc(i.missing)}${i.when ? " · " + esc(i.when) : ""}</p>
+      ${i.where ? `<a class="btn" href="${i.where}">Посмотреть</a>` : ""}</div>`;
+    const person = p => { const sm = I.summary(I.forWho(p.id)); return `<div class="card person"><div class="row"><b>${esc(p.name)}</b><span class="pct">${sm.pct}%</span></div>
+      <div class="xp" style="margin:8px 0"><i style="width:${sm.pct}%"></i></div><div class="muted tiny">Готово ${sm.ready} · частично ${sm.partial} · в плане и позже ${sm.notDone} из ${sm.total}</div></div>`; };
+    FW.app.innerHTML = `<a class="back" href="#/profile">← Профиль</a><h1>Идеи команды</h1>
+      <p class="muted">Что предложили Саня и Айдархан и что с этим сделано. Нажми «Посмотреть», чтобы открыть функцию.</p>
+      <div class="persons">${I.PEOPLE.map(person).join("")}</div>
+      <p class="muted tiny">Считаем так: готово = 1, частично = 0,5. Цифры по коду и тестам; проверка на разных телефонах впереди.</p>
+      <h2>Главное по просьбе Айдархана</h2>${I.PRIORITIES.map(card).join("")}
+      <h2>Все идеи</h2>
+      <div class="chips" id="ideafilters">
+        ${[["", "Все"], ["sanya", "Саня"], ["aidarkhan", "Айдархан"]].map(([v, l]) => `<button class="ghost ${ideasUi.who === v ? "on" : ""}" data-who="${v}" type="button">${l}</button>`).join("")}
+        ${[["", "Любой статус"], ["ready", "Готово"], ["partial", "Частично"], ["planned", "В плане"], ["later", "Позже"]].map(([v, l]) => `<button class="ghost ${ideasUi.status === v ? "on" : ""}" data-st="${v}" type="button">${l}</button>`).join("")}</div>
+      <div id="ideaslist"></div>`;
+    const draw = () => {
+      const list = I.ITEMS.filter(i => (!ideasUi.who || i.who === ideasUi.who) && (!ideasUi.status || i.status === ideasUi.status));
+      document.getElementById("ideaslist").innerHTML = list.length ? list.map(card).join("") : "<div class='card'><p class='muted'>Нет идей с такими условиями.</p></div>";
+      FW.app.querySelectorAll("#ideafilters [data-who]").forEach(b => b.classList.toggle("on", b.dataset.who === ideasUi.who));
+      FW.app.querySelectorAll("#ideafilters [data-st]").forEach(b => b.classList.toggle("on", b.dataset.st === ideasUi.status));
+    };
+    draw();
+    FW.app.querySelectorAll("#ideafilters [data-who]").forEach(b => b.onclick = () => { ideasUi.who = b.dataset.who; draw(); });
+    FW.app.querySelectorAll("#ideafilters [data-st]").forEach(b => b.onclick = () => { ideasUi.status = b.dataset.st; draw(); });
+    if (focus) { const el = document.getElementById("idea-" + focus); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" }); }
+  };
 })();

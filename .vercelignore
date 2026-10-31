@@ -6,4 +6,3 @@ docs
 .vercelignore
 test
 test-ui
-package.json

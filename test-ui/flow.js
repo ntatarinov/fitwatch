@@ -169,6 +169,28 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok($$(w, ".toast").length === 0, "демо-данные не вызывают лавину уведомлений");
   ok(state(w).seen.length >= 3, "после демо достижения отмечены как показанные");
 
+  // 7c. идеи команды
+  await go(w, "#/ideas");
+  ok(/Идеи команды/.test(text(w, "h1")) && $$(w, ".person").length === 2, "идеи: два участника");
+  ok(/54%/.test(text(w, ".persons")) && /14%/.test(text(w, ".persons")), "идеи: проценты 54% и 14%");
+  ok($$(w, "#ideaslist .idea").length === 25 && $$(w, ".idea.st-ready").length >= 6, "идеи: 25 идей, готовые отмечены");
+  click(w, $(w, '[data-st="ready"]'));
+  ok($$(w, "#ideaslist .idea").length === 5 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 5");
+  click(w, $(w, '[data-who="aidarkhan"]'));
+  ok($$(w, "#ideaslist .idea").length === 0, "идеи: у Айдархана готовых нет");
+  click(w, $(w, '[data-st=""]')); click(w, $(w, '[data-who=""]'));
+  const links = $$(w, ".idea a.btn").map(a => a.getAttribute("href"));
+  ok(links.length >= 12, "идеи: у готовых и частичных есть кнопка «Посмотреть» (" + links.length + ")");
+  let badLinks = [];
+  for (const h of Array.from(new Set(links))) { await go(w, h); if (/Не найдено/.test(text(w, "main")) || text(w, "main").length < 30) badLinks.push(h); }
+  ok(badLinks.length === 0, "идеи: все ссылки «Посмотреть» открывают экраны " + badLinks.join(","));
+  await go(w, "#/ideas/K5");
+  ok(!!$(w, "#idea-K5.hl"), "идеи: ссылка с номером подсвечивает идею");
+  await go(w, "#/library");
+  ok(!!$(w, ".idea-chip"), "на экране каталога есть метка идеи команды");
+  await go(w, "#/");
+  ok(/Идеи команды/.test(text(w, "main")), "главная ведёт в «Идеи команды»");
+
   // 8. старые маршруты работают
   for (const h of ["#/programs", "#/p/start", "#/d/start/d1", "#/e/start/squat", "#/trainer", "#/checkin", "#/plan"]) {
     await go(w, h);

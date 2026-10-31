@@ -212,3 +212,28 @@ main.enter > *:nth-child(5) { animation-delay:.16s; } main.enter > *:nth-child(6
   *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
   .ring .val { stroke-dashoffset:var(--off) !important; }
 }
+
+/* ---- рейтинг, формы входа, график ---- */
+.lb-row { display:flex; align-items:center; gap:12px; padding:12px 14px; margin:8px 0; border-radius:14px; border:1px solid var(--line); background:var(--card); }
+.lb-row .rk { width:34px; text-align:center; font-size:22px; font-weight:800; }
+.lb-row .nm { flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-row .pt { text-align:right; } .lb-row .pt b { font-size:20px; } .lb-row .pt small { display:block; color:var(--muted); font-size:11px; }
+.lb-row:nth-child(-n+3) { border-color:rgba(245,158,11,.4); }
+.lb-row.me { border-color:var(--accent); background:linear-gradient(135deg,rgba(62,224,164,.16),rgba(34,211,238,.06)); box-shadow:0 0 22px rgba(62,224,164,.18); }
+.chart { width:100%; height:auto; margin-top:10px; }
+.ch-line { stroke:var(--accent); stroke-width:2.5; stroke-linejoin:round; } .ch-dot { fill:var(--accent2); stroke:#06131b; stroke-width:1.5; }
+.ch-grid { stroke:rgba(255,255,255,.08); stroke-dasharray:3 4; } .ch-lab { fill:var(--muted); font-size:9px; }
+
+/* ---- идеи команды ---- */
+.idea-row { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; }
+.idea-chip { font-size:12px; padding:4px 10px; border-radius:999px; border:1px solid rgba(139,92,246,.6); background:rgba(139,92,246,.14); color:#ddd0ff; }
+.idea-chip:hover { background:rgba(139,92,246,.28); }
+.persons { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .person .pct { font-size:30px; font-weight:800; color:var(--accent); }
+.idea .who { font-weight:700; } .idea p { margin:6px 0; }
+.st { font-size:12px; padding:2px 9px; border-radius:999px; border:1px solid var(--line); }
+.st.ready { background:rgba(62,224,164,.18); color:#7ff0c4; border-color:rgba(62,224,164,.6); } .st.partial { background:rgba(245,158,11,.16); color:#fbbf6a; border-color:rgba(245,158,11,.5); }
+.st.planned { background:rgba(34,211,238,.14); color:#7fe3f3; border-color:rgba(34,211,238,.5); } .st.later { background:rgba(255,255,255,.06); color:var(--muted); }
+.idea.hl { animation:hl 1.6s ease-out 2; border-color:var(--accent2); }
+@keyframes hl { 0%,100% { box-shadow:0 0 0 0 rgba(34,211,238,0); } 40% { box-shadow:0 0 26px 4px rgba(34,211,238,.45); } }
+.chips button.ghost.on { background:var(--grad); color:var(--on-accent); border-color:transparent; }
+@media (max-width:420px) { .persons { grid-template-columns:1fr; } }
