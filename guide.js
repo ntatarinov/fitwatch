@@ -184,7 +184,7 @@
   function installSlide(status) {
     const ios = status === "ios";
     return { id: "install", title: "Установи как приложение", status,
-      text: ios ? "Нажми «Поделиться» в Safari и выбери «На экран Домой». Значок появится рядом с остальными приложениями."
+      text: ios ? "Нажми «Поделиться» (в Safari значок внизу экрана, в Chrome справа в адресной строке) и выбери «На экран Домой». Открывай сайт в браузере, не внутри Telegram или Instagram."
         : "Откроется с экрана телефона как обычное приложение: без адресной строки, быстрее и даже без сети.",
       art: `<div class="ob-app"><img src="/icons/icon-192.png" alt="" width="104" height="104"><span class="ob-dl">${icon(ios ? "share" : "download")}</span></div>` };
   }

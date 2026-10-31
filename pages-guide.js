@@ -70,7 +70,7 @@
       <h2>Частые вопросы</h2>
       ${FAQ.map(q => `<details class="card faq"><summary>${q[0]}</summary><p class="muted">${q[1]}</p></details>`).join("")}
       <h2>Приложение на телефоне</h2>
-      ${window.Pwa ? window.Pwa.card() || `<div class="card"><p class="muted">${window.Pwa.status() === "installed" ? "Приложение уже установлено, ты в нём." : "В меню браузера выбери «Установить приложение» или «Добавить на главный экран»."}</p></div>` : ""}
+      ${window.Pwa ? window.Pwa.card() || `<div class="card"><p class="muted">${window.Pwa.status() === "installed" ? "Приложение уже установлено, ты в нём." : "В меню браузера выбери «Установить приложение» или «Добавить на главный экран» (в Samsung Internet и Firefox пункт может называться иначе, но он всегда в меню)."}</p></div>` : ""}
       <div class="card"><b>Настроить под себя</b><p class="muted">Режим Lite или Pro, нужные разделы и тема меняются в Профиле.</p><div class="row" style="flex-wrap:wrap;gap:8px"><a class="btn" href="#/profile">Открыть настройки</a><button type="button" class="ghost" data-replay>Показать приветствие ещё раз</button><button type="button" class="ghost" data-tips-reset>Вернуть подсказки</button></div></div>`;
   };
 
