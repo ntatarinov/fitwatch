@@ -4,6 +4,7 @@
   const P = (window.PAGES = window.PAGES || {});
   const A = () => window.Account;
   const MEDAL = ["🥇", "🥈", "🥉"];
+  const errText = r => (r.error === "offline" ? "Сервер недоступен" : r.error);
 
   const loading = FW => { FW.app.innerHTML = '<div class="card"><p class="muted">Загружаю…</p></div>'; };
   const offlineCard = '<div class="card"><b>Сервер данных ещё подключается</b><p class="muted">Приложение работает без входа: данные лежат на этом устройстве. Рейтинг, история веса и переписка с тренером появятся, когда сервер заработает.</p></div>';
@@ -20,23 +21,54 @@
     if (added) window.FX.toast("Перенесено тренировок: " + added, "☁️");
   }
 
-  // Кнопка Telegram: настройки берутся с сервера; если бот не настроен, блок не показывается.
+  // Кнопка Telegram (новая схема входа Telegram, OpenID): библиотека Telegram открывает окно входа и отдаёт id_token,
+  // сервер проверяет его подпись. Библиотека и одноразовое значение (nonce) готовятся заранее, чтобы окно открылось по нажатию.
+  let tgLib = null;
+  function loadTelegramLib() {
+    if (window.Telegram && window.Telegram.Login) return Promise.resolve();
+    if (!tgLib) tgLib = new Promise((ok, no) => {
+      const sc = document.createElement("script");
+      sc.src = "https://telegram.org/js/telegram-login.js?3"; sc.async = true;
+      sc.onload = ok; sc.onerror = () => { tgLib = null; no(new Error("lib")); };
+      document.head.appendChild(sc);
+    });
+    return tgLib;
+  }
   async function mountTelegram(FW, box, mode) {
     const acc = A(), cfg = await acc.config();
-    if (!cfg.telegramEnabled || !cfg.telegramBot || !box.isConnected) { if (box.parentNode) box.parentNode.removeChild(box); return; }
-    window.__fwTg = async user => {
-      const r = await acc.telegramLogin(user);
-      if (!r.ok) { window.FX.toast(r.error === "offline" ? "Сервер недоступен" : r.error, "⚠️"); return; }
-      await acc.refresh();
-      if (mode === "link") { window.FX.toast("Telegram привязан", "✓"); P.account(FW); return; }
-      await afterAuth(FW);
-      FW.go("#/rating");
+    if (!cfg.telegramEnabled || !cfg.telegramClientId || !box.isConnected) { if (box.parentNode) box.parentNode.removeChild(box); return; }
+    const btn = document.createElement("button"), msg = document.createElement("div");
+    btn.type = "button"; btn.className = "tg-btn"; btn.disabled = true;
+    btn.textContent = mode === "link" ? "✈️ Привязать Telegram" : "✈️ Войти через Telegram";
+    msg.className = "status"; msg.setAttribute("role", "alert");
+    box.appendChild(btn); box.appendChild(msg);
+    let nonce = null;
+    const prepare = async () => {
+      nonce = null; btn.disabled = true;
+      try {
+        await loadTelegramLib();
+        const r = await acc.telegramNonce();
+        if (!box.isConnected) return;
+        if (r.ok) { nonce = r.data.nonce; btn.disabled = false; msg.textContent = ""; } else msg.textContent = errText(r);
+      } catch (e) { if (box.isConnected) msg.textContent = "Не удалось загрузить Telegram. Проверьте интернет и обновите страницу."; }
     };
-    const sc = document.createElement("script");
-    sc.async = true; sc.src = "https://telegram.org/js/telegram-widget.js?22";
-    sc.setAttribute("data-telegram-login", cfg.telegramBot); sc.setAttribute("data-size", "large"); sc.setAttribute("data-userpic", "false");
-    sc.setAttribute("data-request-access", "write"); sc.setAttribute("data-onauth", "__fwTg(user)");
-    box.appendChild(sc);
+    btn.onclick = () => {
+      if (!nonce || !(window.Telegram && window.Telegram.Login)) return;
+      const used = nonce; nonce = null; btn.disabled = true;
+      window.Telegram.Login.auth({ client_id: cfg.telegramClientId, scope: ["profile", "write"], nonce: used, lang: "ru" }, async res => {
+        if (!res || res.error || !res.id_token) {
+          if (res && res.error && res.error !== "popup_closed") window.FX.toast("Вход через Telegram не удался", "⚠️");
+          prepare(); return;
+        }
+        const r = await acc.telegramLogin(res.id_token);
+        if (!r.ok) { window.FX.toast(errText(r), "⚠️"); prepare(); return; }
+        await acc.refresh();
+        if (mode === "link") { window.FX.toast("Telegram привязан", "✓"); P.account(FW); return; }
+        await afterAuth(FW);
+        FW.go("#/rating");
+      });
+    };
+    prepare();
   }
 
   P.accountCard = function (FW) {

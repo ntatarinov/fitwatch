@@ -132,6 +132,14 @@ const MIGRATIONS = [
        EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     ],
   },
+  {
+    version: 4,
+    name: "one-time nonces for Telegram login",
+    sql: [
+      `CREATE TABLE IF NOT EXISTS login_nonces (nonce text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now())`,
+      `CREATE INDEX IF NOT EXISTS login_nonces_created ON login_nonces(created_at)`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

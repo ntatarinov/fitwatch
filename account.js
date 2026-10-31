@@ -60,8 +60,9 @@
     state, api, refresh, profileFromLocal, workoutsFromLog,
     onChange: f => listeners.push(f),
     // настройки (имя бота), вход и привязка Telegram
-    config: () => (cfgPromise || (cfgPromise = api("GET", "/api/config").then(r => (r.ok ? r.data : { telegramEnabled: false, telegramBot: null })))),
-    telegramLogin: data => api("POST", "/api/auth/telegram", data),
+    config: () => (cfgPromise || (cfgPromise = api("GET", "/api/config").then(r => (r.ok ? r.data : { telegramEnabled: false, telegramClientId: null })))),
+    telegramNonce: () => api("POST", "/api/auth/telegram/nonce", {}),
+    telegramLogin: idToken => api("POST", "/api/auth/telegram", { id_token: idToken }),
     register: (email, password, name) => ok(api("POST", "/api/auth/register", { email, password, name })),
     login: (email, password) => ok(api("POST", "/api/auth/login", { email, password })),
     logout: () => ok(api("POST", "/api/auth/logout", {})),

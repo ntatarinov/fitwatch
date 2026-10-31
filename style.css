@@ -241,3 +241,6 @@ main.enter > *:nth-child(5) { animation-delay:.16s; } main.enter > *:nth-child(6
 /* ---- тарифы, чат ---- */
 .tier ul { margin:8px 0 0; padding-left:20px; } .tier.cur { border-color:var(--accent); box-shadow:0 0 22px rgba(62,224,164,.18); }
 .chat { max-height:55vh; overflow-y:auto; }
+
+.tg-btn { width:100%; padding:13px; font-size:17px; background:linear-gradient(135deg,#2AABEE,#229ED9); color:#fff; box-shadow:0 8px 26px rgba(42,171,238,.35); }
+.tg-btn[disabled] { filter:grayscale(.5); opacity:.6; }
