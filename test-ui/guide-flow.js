@@ -285,7 +285,8 @@ function ok(c, name) { n++; if (!c) { failed++; console.log("FAIL:", name); } el
   ok(/^#\/client\/demo-\d+$/.test(dem), "карточка ведёт на дашборд примера");
   await go(guest.w, dem);
   ok(await (async () => { for (let k = 0; k < 20 && !$(guest.w, ".kpis"); k++) await tick(20); return !!$(guest.w, ".kpis"); })(), "дашборд клиента из примера открылся");
-  ok($$(guest.w, ".kpis .kpi").length === 4 && !!$(guest.w, "svg.bars") && !!$(guest.w, ".demo-banner") && $(guest.w, "a.back").getAttribute("href") === "#/coach/demo", "в нём показатели, график, подпись «пример» и возврат в пример");
+  ok($$(guest.w, ".kpis:not(.kpis3) .kpi").length === 4 && !!$(guest.w, "svg.bars") && !!$(guest.w, ".demo-banner") && $(guest.w, "a.back").getAttribute("href") === "#/coach/demo", "в нём показатели, график, подпись «пример» и возврат в пример");
+  ok(/Тренировки с подходами/.test(text(guest.w, "main")) && $$(guest.w, "details.sess").length === 1, "в примере у клиента есть тренировка с подходами");
   click(guest.w, $(guest.w, "#nsave"));
   await tick(30);
   ok(/не сохраняется/.test(text(guest.w, "#nstat")), "заметка в примере не сохраняется и честно об этом говорит");

@@ -66,19 +66,22 @@
   }
 
   // labels: { muscleId: "название" }. Возвращает пустую строку для неизвестного вида.
-  function svg(view, selected, labels) {
+  // opts.levels: { muscleId: 0..4 } — окраска по уровню (статистика); opts.compact — без подписей, узкая рамка; opts.levelNames: { 0..4: название }.
+  function svg(view, selected, labels, opts) {
+    const o = opts || {}, levels = o.levels || null;
     const list = MUSCLES[view];
     if (!list) return "";
     const name = m => (labels && labels[m]) || m;
     const base = SILHOUETTE.map(d => `<path class="bs-base" d="${d}"/><path class="bs-base" d="${d}" ${MIRROR}/>`).join("");
     const muscles = list.map(z => {
-      const on = z.m === selected;
+      const on = z.m === selected, lv = levels ? levels[z.m] || 0 : null;
       const half = z.d.map(d => `<path d="${d}"/>`).join("") + (z.lines || []).map(d => `<path class="fib" d="${d}"/>`).join("");
-      return `<g class="mz${on ? " on" : ""}" data-m="${z.m}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${esc(name(z.m))}"><title>${esc(name(z.m))}</title>` +
+      const extra = lv === null ? "" : ` lv-${lv}`, lvName = lv === null ? "" : ": " + ((o.levelNames && o.levelNames[lv]) || "уровень " + lv);
+      return `<g class="mz${on ? " on" : ""}${extra}" data-m="${z.m}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${esc(name(z.m) + lvName)}"><title>${esc(name(z.m) + lvName)}</title>` +
         half + `<g ${MIRROR}>${half}</g></g>`;
     }).join("");
     // Подписи: слева — к точке на левой половине фигуры, справа — к зеркальной точке на правой половине.
-    const callouts = ["l", "r"].map(side => layout(list.filter(z => z.side === side)).map(({ x: z, y }) => {
+    const callouts = o.compact ? "" : ["l", "r"].map(side => layout(list.filter(z => z.side === side)).map(({ x: z, y }) => {
       const on = z.m === selected, ax = FX + (side === "l" ? z.a[0] : 200 - z.a[0]), ay = FY + z.a[1];
       const tx = side === "l" ? 8 : W - 8, lx = side === "l" ? 100 : W - 100;
       const lines = wrap(name(z.m), 13);
@@ -87,7 +90,7 @@
         `<path class="ml-line" d="M${lx} ${y - 4} L${ax} ${ay}"/><circle class="ml-dot" cx="${ax}" cy="${ay}" r="2.5"/>` +
         `<text x="${tx}" y="${y - 4 - (lines.length - 1) * 7}" text-anchor="${side === "l" ? "start" : "end"}">${text}</text></g>`;
     }).join("")).join("");
-    return `<svg class="body-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="${view === "front" ? "Вид спереди" : "Вид сзади"}">` +
+    return `<svg class="body-svg${o.compact ? " compact" : ""}" viewBox="${o.compact ? "108 6 144 446" : "0 0 " + W + " " + H}" role="group" aria-label="${view === "front" ? "Вид спереди" : "Вид сзади"}">` +
       `<g transform="translate(${FX},${FY})">${base}${muscles}</g>${callouts}</svg>`;
   }
 

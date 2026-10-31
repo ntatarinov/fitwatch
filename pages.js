@@ -96,7 +96,8 @@
         <a class="pill" href="#/x/${e.id}">${e.video ? window.Icons.svg("play", 14) + " видео" : "техника"}</a></div></div>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/plan">← Мой план</a><h1>${esc(day.title)}</h1>
-      <p class="muted">Разомнись 3–5 минут, затем выполни план. Если не знаешь технику, открой упражнение.</p>${items}<div id="checkin"></div>`;
+      <p class="muted">Разомнись 3–5 минут, затем выполни план. Если не знаешь технику, открой упражнение.</p>${items}<div id="checkin"></div>
+      <a class="btn ghost-btn wide-btn" href="#/log/plan/${esc(day.id)}">Записать подходы и веса</a>`;
     FW.renderCheckin({ id: "plan" }, day, justDone, () => P.planDay(FW, did, true));
   };
 

@@ -460,3 +460,30 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .b3d-credit { display:block; position:absolute; left:8px; bottom:30px; right:8px; text-align:center; font-size:10px; color:#9AA1A8; text-decoration:underline; }
 .b3d-fail p { color:#C9CDD2; }
 .b3d-credit { top:10px; bottom:auto; left:10px; right:110px; text-align:left; }
+
+/* ================= Запись тренировки и статистика ================= */
+:root { --lv1:#9C7B5B; --lv2:#D08B3E; --lv3:#AAB4BF; --lv4:#F2B90C; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --lv1:#8A6C4E; --lv2:#C97E2F; --lv3:#B7C0CA; --lv4:#F5C21B; } }
+:root[data-theme="dark"] { --lv1:#8A6C4E; --lv2:#C97E2F; --lv3:#B7C0CA; --lv4:#F5C21B; }
+.mz.lv-1 { fill:var(--lv1); } .mz.lv-2 { fill:var(--lv2); } .mz.lv-3 { fill:var(--lv3); } .mz.lv-4 { fill:var(--lv4); }
+.mz.picked path { stroke:var(--text); stroke-width:2.4; }
+.stat-figs { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0 4px; } .stat-figs .body-svg { max-width:230px; height:auto; }
+.lv-legend { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 8px; }
+.lv-chip { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:650; padding:4px 11px; border-radius:999px; background:var(--surface-2); } .lv-chip i { width:10px; height:10px; border-radius:50%; background:var(--mz); }
+.lv-chip.lv-1 i, .lv-fill.lv-1 { background:var(--lv1); } .lv-chip.lv-2 i, .lv-fill.lv-2 { background:var(--lv2); } .lv-chip.lv-3 i, .lv-fill.lv-3 { background:var(--lv3); } .lv-chip.lv-4 i, .lv-fill.lv-4 { background:var(--lv4); }
+.bar > i.lv-fill { background:var(--mz); }
+.mrow { display:grid; grid-template-columns:1fr auto; gap:2px 10px; margin-top:12px; } .mrow .bar { grid-column:1 / -1; }
+.stat-tabs { margin:8px 0 6px; } .stat-tabs .seg-b { text-align:center; }
+.kpis3 { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; } .kpis3 .kpi { padding:12px 10px; } .kpis3 .kv { font-size:22px; overflow-wrap:anywhere; } .kpis3 .kl { font-size:12.5px; }
+.wide-btn { display:block; text-align:center; margin:12px 0; }
+.center { text-align:center; }
+.lg-bar { position:relative; } .lg-bar input { width:100%; font-weight:700; font-size:18px; } .lg-clock { position:absolute; right:18px; top:14px; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent-text); }
+.lg-bar label { display:block; }
+.lg-head, .lg-set { display:grid; grid-template-columns:30px 1fr 1fr 44px; gap:8px; align-items:center; margin-top:8px; } .lg-head { font-size:12px; color:var(--muted); font-weight:700; margin-top:12px; }
+.lg-set input { width:100%; min-height:46px; text-align:center; font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; } .lg-n { text-align:center; font-weight:700; color:var(--muted); }
+.icon-only { padding:8px; min-width:40px; min-height:40px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; }
+.lg-ex .tiny-btn { margin-top:10px; }
+.lg-res { display:grid; gap:6px; margin-top:8px; } .lg-pick { text-align:left; display:flex; flex-direction:column; gap:2px; border-radius:14px; padding:10px 14px; } .lg-pick small { color:var(--muted); font-weight:500; }
+.lg-total { position:sticky; bottom:calc(76px + env(safe-area-inset-bottom)); display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 8px; padding:10px 12px 10px 18px; border-radius:999px; background:var(--text); color:var(--bg); box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:4; }
+.lg-sum { display:flex; gap:14px; flex-wrap:wrap; font-size:14px; } .lg-sum b { font-size:18px; }
+.lg-lines { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }

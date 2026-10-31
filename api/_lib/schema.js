@@ -161,6 +161,27 @@ const MIGRATIONS = [
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false`,
     ],
   },
+  {
+    version: 8,
+    name: "workout sessions with sets, reps and weights",
+    sql: [
+      `CREATE TABLE IF NOT EXISTS workout_sessions (
+         id uuid PRIMARY KEY,
+         user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         day date NOT NULL,
+         started_at timestamptz,
+         duration_sec int NOT NULL CHECK (duration_sec BETWEEN 0 AND 86400),
+         title text NOT NULL CHECK (char_length(title) BETWEEN 1 AND 80),
+         program text,
+         day_id text,
+         items jsonb NOT NULL,
+         tonnage_kg numeric(10,1) NOT NULL CHECK (tonnage_kg >= 0),
+         sets int NOT NULL CHECK (sets >= 0),
+         created_at timestamptz NOT NULL DEFAULT now()
+       )`,
+      `CREATE INDEX IF NOT EXISTS workout_sessions_user_day ON workout_sessions(user_id, day DESC)`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

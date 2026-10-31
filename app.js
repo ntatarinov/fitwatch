@@ -20,7 +20,7 @@
   // done/watched — просмотр видео; log — отметки «Тренировка сделана» [{date,p,d,points,t}];
   // checkins — ежедневный отзыв [{date,energy,mood,barrier,liked,disliked,idea}];
   // food — дневник питания [{date,name,kcal, p,f,c,grams,nid}] (БЖУ может не быть)
-  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null, seen: null, lvl: 0, sleep: [] });
+  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null, seen: null, lvl: 0, sleep: [], sessions: [], draft: null });
   // Сохранённое состояние проверяется по типам: поле не того вида (после старой версии или ручной правки) заменяется пустым,
   // иначе одна ошибка ломала бы главную и профиль, где лежит кнопка сброса.
   function normalize(raw) {
@@ -34,7 +34,28 @@
     if (isObj(o.plan) && Array.isArray(o.plan.days)) s.plan = o.plan;
     if (Array.isArray(o.seen)) s.seen = o.seen;
     if (Number.isFinite(o.lvl)) s.lvl = o.lvl;
+    if (Array.isArray(o.sessions)) s.sessions = o.sessions.map(cleanSession).filter(Boolean);
+    s.draft = cleanDraft(o.draft);
     return s;
+  }
+  // Тренировка с подходами из хранилища или с сервера: проверка типов и границ, лишнее отбрасывается.
+  function cleanSession(x) {
+    if (!x || typeof x !== "object" || typeof x.id !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(x.date || "")) return null;
+    const items = (Array.isArray(x.items) ? x.items : []).map(it => ({
+      ex: String((it && it.ex) || "").slice(0, 24), name: String((it && it.name) || "").slice(0, 60),
+      sets: (Array.isArray(it && it.sets) ? it.sets : []).map(v => ({ reps: Math.min(1000, Math.round(Number(v && v.reps)) || 0), kg: Math.min(1000, Math.max(0, Math.round((Number(v && v.kg) || 0) * 10) / 10)) })).filter(v => v.reps > 0),
+    })).filter(it => it.ex && it.name && it.sets.length).slice(0, 20);
+    if (!items.length) return null;
+    return { id: x.id, date: x.date, startedAt: typeof x.startedAt === "string" ? x.startedAt : null, durationSec: Math.max(0, Math.min(86400, Math.round(Number(x.durationSec)) || 0)),
+      title: String(x.title || "Тренировка").slice(0, 80), program: typeof x.program === "string" ? x.program : null, dayId: typeof x.dayId === "string" ? x.dayId : null, items, pending: x.pending === true };
+  }
+  // Начатая, но не завершённая тренировка. Значения полей — строки, как их вводит человек.
+  function cleanDraft(x) {
+    if (!x || typeof x !== "object" || typeof x.id !== "string" || !Number.isFinite(x.startedAt) || !Array.isArray(x.items)) return null;
+    return { id: x.id, startedAt: x.startedAt, title: String(x.title || "Тренировка").slice(0, 80),
+      src: x.src && typeof x.src.p === "string" && typeof x.src.d === "string" ? { p: x.src.p.slice(0, 24), d: x.src.d.slice(0, 24) } : null,
+      items: x.items.filter(it => it && typeof it === "object" && it.ex && it.name).slice(0, 20).map(it => ({ ex: String(it.ex).slice(0, 24), name: String(it.name).slice(0, 60),
+        sets: (Array.isArray(it.sets) ? it.sets : []).slice(0, 30).map(v => ({ reps: String((v && v.reps) || "").slice(0, 6), kg: String((v && v.kg) || "").slice(0, 7), hint: v && v.hint ? String(v.hint).slice(0, 16) : "" })) })) };
   }
   function load() {
     try { return normalize(JSON.parse(localStorage.getItem(KEY))); }
@@ -179,9 +200,9 @@
   }
   const foodToday = () => state.food.map((f, i) => ({ f, i })).filter(x => x.f.date === today());
 
-  function logWorkout(p, d) {
+  function logWorkout(p, d, extra) {
     if (trainedToday()) return false;
-    const entry = { date: today(), p: p.id, d: d.id, points: dayPoints(d), t: d.title };
+    const entry = Object.assign({ date: today(), p: p.id, d: d.id, points: dayPoints(d), t: d.title }, extra || {});
     state.log.push(entry);
     save();
     // Если человек вошёл в аккаунт, тренировка записывается и на сервер: оттуда баллы и бонусы для рейтинга.
@@ -199,11 +220,63 @@
     save();
     if (r.ok) window.Account.refresh();
   }
+  // ---------- тренировки с подходами ----------
+  const newId = () => (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => ((Math.random() * 16) | 0).toString(16)));
+  const muscleOfEx = id => { const e = window.Catalog.byId(id); return e ? e.muscles : []; };
+  const num = v => Number(String(v).replace(",", "."));
+  // Завершение: черновик → тренировка. Отметка готовой программы за сегодня привязывается к ней (sid), чтобы тренировка не считалась дважды.
+  function finishSession(draft, minutes) {
+    const items = draft.items.map(it => ({ ex: it.ex, name: it.name, sets: it.sets.map(s => ({ reps: Math.min(1000, Math.round(num(s.reps)) || 0), kg: Math.min(1000, Math.max(0, Math.round((num(s.kg) || 0) * 10) / 10)) })).filter(s => s.reps > 0) })).filter(it => it.sets.length);
+    if (!items.length) return null;
+    const src = draft.src, sess = { id: draft.id, date: today(), startedAt: new Date(draft.startedAt).toISOString(), durationSec: Math.max(60, Math.min(86400, Math.round(minutes * 60))),
+      title: (draft.title || "Тренировка").trim().slice(0, 80) || "Тренировка", program: src ? src.p : null, dayId: src ? src.d : null, items, pending: false };
+    state.sessions.push(sess);
+    state.draft = null;
+    const mark = src && state.log.find(l => l.date === sess.date && l.p === src.p && l.d === src.d && !l.sid);
+    if (mark) mark.sid = sess.id;
+    else if (!trainedToday()) {
+      // Запись подходов засчитывается как тренировка дня: баллы и серия, как при отметке программы.
+      const planDay = src && src.p === "plan" && state.plan && state.plan.days.find(x => x.id === src.d);
+      const prog = src && src.p !== "plan" && PROGRAMS.find(x => x.id === src.p), pd = prog && prog.days.find(x => x.id === src.d);
+      logWorkout(src ? { id: src.p } : { id: "free" }, src ? (planDay || pd || { id: src.d, title: sess.title }) : { id: "log", title: sess.title }, { sid: sess.id });
+    }
+    save();
+    if (window.Account.state.status === "user" || window.Account.state.status === "offline") { sess.pending = true; save(); sendSession(sess); }
+    return sess;
+  }
+  async function sendSession(sess) {
+    const r = await window.Account.postSession({ id: sess.id, day: sess.date, startedAt: sess.startedAt, durationSec: sess.durationSec, title: sess.title, program: sess.program, dayId: sess.dayId,
+      items: sess.items.map(it => ({ ex: it.ex, name: it.name, sets: it.sets })) });
+    if (r.ok || [400, 409, 429].includes(r.status)) delete sess.pending; // записана или повтор ничего не изменит
+    save();
+  }
+  function removeSession(id) {
+    state.sessions = state.sessions.filter(x => x.id !== id);
+    state.log.forEach(l => { if (l.sid === id) delete l.sid; }); // отметка программы снова считается тренировкой сама
+    save();
+    if (window.Account.state.status === "user") window.Account.deleteSession(id);
+  }
+  // На новом устройстве тренировки берутся с сервера: добавляются только те, которых здесь нет.
+  let pulled = false;
+  async function pullSessions() {
+    if (pulled || window.Account.state.status !== "user") return;
+    pulled = true;
+    const r = await window.Account.sessions();
+    if (!r.ok) { pulled = false; return; }
+    const have = new Set(state.sessions.map(x => x.id));
+    const add = r.data.items.map(cleanSession).filter(x => x && !have.has(x.id));
+    if (add.length) { add.forEach(x => { x.pending = false; state.sessions.push(x); }); save(); const a = location.hash.split("/")[1] || ""; if (["", "stats", "profile"].includes(a)) route(true); }
+  }
+
   let flushing = false;
   async function flushPending() {
     if (flushing || window.Account.state.status !== "user") return;
     flushing = true;
-    try { for (const e of state.log.filter(x => x.pending)) await sendWorkout(e); } finally { flushing = false; }
+    try {
+      for (const e of state.log.filter(x => x.pending)) await sendWorkout(e);
+      for (const s of state.sessions.filter(x => x.pending)) await sendSession(s);
+      await pullSessions();
+    } finally { flushing = false; }
   }
 
   // Демо-данные: две недели жизни «спринтера», чтобы сразу показать профиль заказчику.
@@ -365,6 +438,13 @@
       ${goal ? `<div class="bar thick"><i class="${left < 0 ? "over" : ""}" style="width:${pct}%"></i></div><div class="muted tiny">${left >= 0 ? "Осталось " + left + " ккал" : "Больше цели на " + (-left) + " ккал"}</div>` : ""}
       <div class="macros">${macro("Белки", sum.p, tg && tg.p)}${macro("Жиры", sum.f, tg && tg.f)}${macro("Углеводы", sum.c, tg && tg.c)}</div></a>`;
   }
+  // Запись тренировки и статистика: две строки на главной и в разделе «Тренировки».
+  function trainingRowsHtml() {
+    const d = state.draft, S = window.Stats, week = S.summarize(state.sessions, state.log, "week", dayNum(today()), muscleOfEx);
+    const clock = d ? S.fmtClock((Date.now() - d.startedAt) / 1000) : "";
+    return linkRow("#/log", "dumbbell", d ? "Продолжить тренировку" : "Записать тренировку", d ? "Идёт уже " + clock + ": " + esc(d.title) : "Подходы, повторения и вес. В конце: сколько поднял и сколько заняло", d ? "Открыть" : "Начать") +
+      linkRow("#/stats", "activity", "Моя статистика", week.workouts ? "За неделю: " + week.workouts + " трен." + (week.tonnage ? ", " + S.fmtKg(week.tonnage) : "") + (week.seconds ? ", " + S.fmtTime(week.seconds) : "") : "Недели, месяцы и уровни мышц", "");
+  }
   // Данные для чек-листа «Первые шаги»: считаются из прогресса и входа в аккаунт.
   function stepsCtx() {
     return { hasPlan: !!state.plan, workouts: state.log.length, foodEntries: state.food.length, loggedIn: window.Account.state.status === "user", nextHref: nextDayHref(), useFood: window.Guide.show("food"), canLogin: window.Account.state.status !== "offline" };
@@ -385,7 +465,7 @@
     const body = Gd.show("progress") ? linkRow("#/body", "scale", "Вес и рост", "История замеров и график", "") : "";
     const proBlock = pro ? (anon ? "" : PAGES.accountCard(FW)) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${ic(p.icon || "dumbbell", 30)}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") + "</div>" : PAGES.proTeaser();
-    app.innerHTML = head + loginRow + install + steps + advice + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
+    app.innerHTML = head + loginRow + install + steps + advice + trainingRowsHtml() + weekCardHtml() + food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
     animateBars();
   }
 
@@ -399,7 +479,7 @@
         linkRow("#/premium", "diamond", "Расширенные программы", "Программы на 4–8 недель по подписке", "Открыть") +
         linkRow("#/trainer", "help", "Тренер по правилам", "Диалог: цель, питание, самочувствие", "Открыть")
       : "";
-    app.innerHTML = "<h1>Тренировки</h1>" + planLink + trainerCards +
+    app.innerHTML = "<h1>Тренировки</h1>" + planLink + trainingRowsHtml() + trainerCards +
       linkRow("#/library", "dumbbell", "Каталог упражнений", "По мышцам, оборудованию и уровню, с моделью тела", String(window.Catalog.EXERCISES.length)) +
       linkRow("#/machines", "book", "Справочник тренажёров", "Для чего тренажёр, мышцы, настройка, техника и безопасность", String(window.Machines.MACHINES.length)) +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
@@ -477,7 +557,8 @@
     app.innerHTML = `<a class="back" href="#/p/${p.id}">← ${esc(p.title)}</a><h1>${esc(d.title)}</h1>
       <p class="muted">Разомнись 3–5 минут, затем выполни план. Если не знаешь технику, сначала открой видео.</p>
       ${items}
-      <div id="checkin"></div>`;
+      <div id="checkin"></div>
+      <a class="btn ghost-btn wide-btn" href="#/log/${p.id}/${d.id}">Записать подходы и веса</a>`;
     renderCheckin(p, d, justDone);
   }
 
@@ -679,6 +760,9 @@
     else if (a === "pd") PAGES.planDay(FW, b);
     else if (a === "library") PAGES.library(FW, b);
     else if (a === "machines") PAGES.machines(FW, b);
+    else if (a === "log") PAGES.log(FW, b, c);
+    else if (a === "session") PAGES.session(FW, b, c);
+    else if (a === "stats") PAGES.stats(FW, b);
     else if (a === "x") PAGES.exercise(FW, b);
     else if (a === "ideas") PAGES.ideas(FW, b);
     else if (a === "sleep") PAGES.sleep(FW);
@@ -701,7 +785,7 @@
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", log: "programs", session: "programs", stats: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     if (keepScroll !== true) window.scrollTo(0, 0);
   }
@@ -716,7 +800,7 @@
   const PAGES = window.PAGES;
   PAGES.stepsCtx = stepsCtx;
   const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; },
-    nav: () => navId, stale: id => id !== navId };
+    nav: () => navId, stale: id => id !== navId, newId, finishSession, removeSession, muscleOf: muscleOfEx };
   window.addEventListener("hashchange", route);
   // Приложение открыто в двух вкладках (или установленное приложение и браузер): берём свежие данные, чтобы не затереть чужие записи.
   window.addEventListener("storage", e => { if (e.key === KEY) { state = load(); renderBadge(); route(true); } });

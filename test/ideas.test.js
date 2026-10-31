@@ -25,7 +25,7 @@ test("у каждой идеи заполнены название, метка �
 test("готовые и частично готовые идеи описывают, что сделано, и ведут на экран приложения", () => {
   I.ITEMS.filter(i => i.status === "ready" || i.status === "partial").forEach(i => {
     assert.ok(i.done.length > 10, i.id + ": что сделано");
-    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|body|checkin|machines|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
+    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|body|checkin|machines|stats|log|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
   });
   I.ITEMS.filter(i => i.status === "planned" || i.status === "later").forEach(i => assert.ok(i.when.length > 3 || i.done.length > 0, i.id + ": когда"));
 });

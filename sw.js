@@ -2,11 +2,11 @@
 // Правила безопасности: запросы к /api/ и чужие адреса он не трогает вообще, ничего личного не кэширует.
 // Статика берётся сначала из сети (всегда свежая версия). Кэш — целая оболочка одной версии, записанная при установке:
 // без сети приложение открывается из неё, а не из смеси старых и новых файлов. Зависшая сеть ждёт не больше 4 секунд.
-const VERSION = "fw-0.9.5";
+const VERSION = "fw-0.9.6";
 const SHELL = [
   "/", "/index.html", "/style.css", "/manifest.webmanifest",
   "/data.js", "/catalog.js", "/machines.js", "/nutrition.js", "/planner.js", "/body.js", "/body3d.js", "/ideas.js", "/achievements.js", "/fx.js", "/engine.js", "/tree.js",
-  "/photo.js", "/charts.js", "/icons.js", "/guide.js", "/pwa.js", "/account.js", "/pages.js", "/pages-account.js", "/pages-trainers.js", "/pages-coach.js", "/pages-guide.js", "/app.js",
+  "/photo.js", "/charts.js", "/stats.js", "/icons.js", "/guide.js", "/pwa.js", "/account.js", "/pages.js", "/pages-account.js", "/pages-trainers.js", "/pages-coach.js", "/pages-stats.js", "/pages-guide.js", "/app.js",
   "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon-maskable-512.png", "/icons/apple-touch-icon.png", "/icons/favicon-32.png",
 ];
 

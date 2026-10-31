@@ -141,6 +141,12 @@ function install(k) {
       const ws = res.workouts.get(l.client_id) || [], wt = res.weights.get(l.client_id) || [];
       stats = summarize(ctx.todayNum, ws, wt, goals && goals.days ? goals.days : null);
       series = { weekStarts: weekStarts(ctx.todayNum), weekly: stats.weekly, weeklyPoints: stats.weeklyPoints, weight: wt, recent: ws.slice(0, 15) };
+      // Записанные тренировки с подходами: список последних и итоги за 28 дней (только при согласии клиента на результаты).
+      const from = V.dayStr(ctx.todayNum - 27);
+      const sr = await ctx.db.query("SELECT id, day::text AS day, duration_sec, title, items, tonnage_kg, sets FROM workout_sessions WHERE user_id = $1 ORDER BY day DESC, created_at DESC LIMIT 12", [l.client_id]);
+      const agg = await ctx.db.query("SELECT count(*)::int AS n, COALESCE(sum(tonnage_kg), 0) AS kg, COALESCE(sum(duration_sec), 0)::int AS sec, COALESCE(sum(sets), 0)::int AS sets FROM workout_sessions WHERE user_id = $1 AND day >= $2::date AND day <= $3::date", [l.client_id, from, V.dayStr(ctx.todayNum + 1)]);
+      series.sessions = sr.map(r => ({ id: r.id, date: r.day, durationSec: r.duration_sec, title: r.title, items: r.items, sets: r.sets, tonnage: Number(r.tonnage_kg) }));
+      stats.sessions28 = { count: agg[0].n, tonnage: Number(agg[0].kg), minutes: Math.round(agg[0].sec / 60), sets: agg[0].sets };
     }
     const msg = (await lastMessages(ctx, [Number(l.id)], u.id)).get(Number(l.id)) || null;
     return { status: 200, body: { client: { linkId: Number(l.id), name: l.client_name, status: l.status, request: l.note, since: l.created },

@@ -75,9 +75,16 @@
     if (!c) return null;
     const r = c._row, active = c.status === "active", s = c.stats;
     const wt = r.weights || [], ds = n => new Date(n * 86400000).toISOString().slice(0, 10);
+    // Выдуманные тренировки с подходами для примера: у клиентов, открывших результаты.
+    const demoSessions = s && s.lastWorkout ? [
+      { id: "d1", date: s.lastWorkout, durationSec: 3300, title: r.goal === "muscle" ? "Грудь и трицепс" : "Круговая", items: r.goal === "muscle"
+        ? [{ ex: "db_bench", name: "Жим гантелей лёжа", sets: [{ reps: 10, kg: 30 }, { reps: 8, kg: 32.5 }, { reps: 8, kg: 32.5 }] }, { ex: "triceps_dips", name: "Обратные отжимания", sets: [{ reps: 12, kg: 0 }, { reps: 10, kg: 0 }] }]
+        : [{ ex: "squat", name: "Приседания", sets: [{ reps: 15, kg: 0 }, { reps: 15, kg: 0 }, { reps: 12, kg: 0 }] }, { ex: "glute_bridge", name: "Ягодичный мост", sets: [{ reps: 15, kg: 20 }, { reps: 15, kg: 20 }] }] },
+    ] : [];
+    const dsum = demoSessions.reduce((a, x) => { const v = window.Stats.volume(x); return { count: a.count + 1, tonnage: a.tonnage + v.tonnage, minutes: a.minutes + Math.round(x.durationSec / 60), sets: a.sets + v.sets }; }, { count: 0, tonnage: 0, minutes: 0, sets: 0 });
     return { client: { linkId: c.linkId, name: c.name, status: c.status, request: c.request, since: c.since }, shareGoals: c.shareGoals, shareResults: c.shareResults,
-      goals: active && r.shareGoals ? { goal: r.goal, level: r.level, days: r.target, minutes: r.minutes, place: r.place, limits: r.limits || [] } : null, stats: s,
-      series: s ? { weekStarts: w.starts, weekly: s.weekly, weeklyPoints: s.weeklyPoints, weight: wt.map((v, i) => ({ day: ds(w.today - Math.round(80 - i * (80 / Math.max(1, wt.length - 1))) ), value: v })),
+      goals: active && r.shareGoals ? { goal: r.goal, level: r.level, days: r.target, minutes: r.minutes, place: r.place, limits: r.limits || [] } : null, stats: s ? Object.assign({}, s, { sessions28: dsum }) : null,
+      series: s ? { sessions: demoSessions, weekStarts: w.starts, weekly: s.weekly, weeklyPoints: s.weeklyPoints, weight: wt.map((v, i) => ({ day: ds(w.today - Math.round(80 - i * (80 / Math.max(1, wt.length - 1))) ), value: v })),
         recent: s.lastWorkout ? Array.from({ length: Math.min(6, s.workouts28) }, (_, i) => ({ day: ds(Math.floor(Date.parse(s.lastWorkout) / 86400000) - i * 2), title: ["День 1: круговая", "День 2: ноги", "Растяжка", "День 3: верх"][i % 4], program: "plan", points: [25, 20, 10, 20][i % 4] })) : [] } : null,
       trainerNote: "", lastMessage: c.lastMessage, flags: c.flags };
   }
@@ -137,6 +144,17 @@
     };
   };
 
+  // Записанные клиентом тренировки с подходами: итоги за 28 дней и раскрывающиеся карточки. Видны только при согласии клиента на результаты.
+  function sessionsHtml(list, agg, esc) {
+    const S = window.Stats, nb = /\u00A0/g;
+    const kp = agg ? `<div class="kpis kpis3"><div class="card kpi"><div class="kv">${agg.count}</div><div class="kl">Записей за 28 дней</div></div><div class="card kpi"><div class="kv">${esc(S.fmtKg(agg.tonnage))}</div><div class="kl">Поднято всего</div></div><div class="card kpi"><div class="kv">${esc(S.fmtTime(agg.minutes * 60))}</div><div class="kl">Время</div></div></div>` : "";
+    return `<h2>Тренировки с подходами</h2>${kp}` + list.map(x => {
+      const v = S.volume(x);
+      return `<details class="card sess"><summary><b>${esc(x.title)}</b><span class="muted"> ${esc(ddmm(x.date))} · ${v.sets} подх. · ${esc(S.fmtKg(v.tonnage))} · ${esc(S.fmtTime(x.durationSec))}</span></summary>
+        ${x.items.map(it => `<div class="sess-ex"><b>${esc(it.name)}</b><div class="lg-lines">${it.sets.map((q, i) => `<span class="pill">${i + 1}: ${q.kg > 0 ? q.reps + " × " + esc(String(q.kg).replace(".", ",")) + " кг" : q.reps + " повт."}</span>`).join("")}</div></div>`).join("")}</details>`;
+    }).join("");
+  }
+
   // ---------- один клиент ----------
   P.clientView = async function (FW, id) {
     const demo = isDemo(id), home = demo ? "#/coach/demo" : "#/coach", nav = FW.nav();
@@ -163,6 +181,7 @@
       ${active ? `<h2>Цели и ограничения</h2>${g ? `<div class="card"><p style="margin:0">${g.goal ? esc(goalLabel(g.goal)) : "Цель не указана"} · ${g.level ? esc(C.labelOf(C.LEVELS, g.level)) : "уровень не указан"}</p>
         <p class="muted" style="margin:6px 0 0">${g.days ? g.days + " дн. по " + g.minutes + " мин · " : ""}${g.place ? esc(PL.PLACES.find(x => x.id === g.place).label) : ""}</p>
         <p class="muted" style="margin:6px 0 0">${g.limits && g.limits.length ? "Ограничения: " + esc(g.limits.map(l => C.labelOf(C.LIMITS, l)).join(", ")) : "Ограничений не указано"}</p></div>` : lock("цели и ограничения")}` : ""}
+      ${active && s && ser.sessions && ser.sessions.length ? sessionsHtml(ser.sessions, s.sessions28, esc) : ""}
       ${active && s ? `<h2>Последние тренировки</h2><div class="card">${ser.recent.length ? ser.recent.map(w => `<div class="row wl"><span>${esc(ddmm(w.day))} · ${esc(w.title || w.program)}</span><span class="pill">+${w.points}</span></div>`).join("") : '<p class="muted">Пока нет.</p>'}</div>` : ""}
       <h2>Моя заметка</h2>
       <div class="card"><p class="muted tiny" style="margin-top:0">Видите только вы, клиент заметку не получает.</p>

@@ -182,6 +182,8 @@ async function register(w, name, email) {
   const aid = (await db.query("SELECT id FROM users WHERE email = 'aliya@test.kz'"))[0].id;
   for (const ago of [0, 1, 3]) await db.query("INSERT INTO workouts(user_id, day, program, day_id, title, base_points, bonus_points) VALUES ($1, current_date - $2::int, 'plan', 'w1', 'Круговая', 20, 0)", [aid, ago]);
   for (const [ago, v] of [[30, 71.2], [3, 69.8]]) await db.query("INSERT INTO measurements(user_id, kind, value, measured_on) VALUES ($1, 'weight', $2, current_date - $3::int)", [aid, v, ago]);
+  await db.query("INSERT INTO workout_sessions(id, user_id, day, duration_sec, title, items, tonnage_kg, sets) VALUES ('00000000-0000-4000-8000-0000000000a1', $1, current_date, 3300, 'Грудь и трицепс', $2::jsonb, 1335, 3)",
+    [aid, JSON.stringify([{ ex: "db_bench", name: "Жим гантелей лёжа", sets: [{ reps: 8, kg: 60 }, { reps: 8, kg: 60 }, { reps: 6, kg: 62.5 }] }])]);
   await reopen(trn.w, "#/coach");
   ok(await until(() => $$(trn.w, ".client").length === 3 && $$(trn.w, ".kpis .kpi").length === 4), "дашборд кабинета: три клиента и четыре показателя");
   const kv = $$(trn.w, ".kpis .kv").map(e => e.textContent);
@@ -199,6 +201,9 @@ async function register(w, name, email) {
   await go(trn.w, "#/client/" + aliyaLink);
   ok(await until(() => !!$(trn.w, ".kpis")) && /Круговая/.test(text(trn.w, "main")) && /69.8 кг/.test(text(trn.w, ".kpis")) && /-1.4 кг/.test(text(trn.w, ".kpis")), "дашборд клиента: тренировки, вес 69.8 и изменение -1.4 кг");
   ok(/3 \/ 3/.test(text(trn.w, ".kpis")) && /регулярность 100%/.test(text(trn.w, ".kpis")), "3 из 3 тренировок недельной цели");
+  ok(/Тренировки с подходами/.test(text(trn.w, "main")) && $$(trn.w, "details.sess").length === 1 && /Грудь и трицепс/.test(text(trn.w, "details.sess summary")), "тренер видит записанную клиентом тренировку с подходами");
+  ok(/Жим гантелей лёжа/.test(text(trn.w, "details.sess")) && /8 × 60 кг/.test(text(trn.w, "details.sess")) && /6 × 62,5 кг/.test(text(trn.w, "details.sess")), "и подробности: упражнение, повторения и вес каждого подхода");
+  ok(/1,3\s*т/.test(text(trn.w, ".kpis3")) && /55\s*мин/.test(text(trn.w, ".kpis3")), "итоги за 28 дней: вес и время: " + text(trn.w, ".kpis3"));
   ok(/Набрать|Похудеть/.test(text(trn.w, "main")) && !!$(trn.w, "svg.chart"), "цели и графики на месте");
   $(trn.w, "#tnote").value = "Начать с ходьбы, колени беречь."; click(trn.w, $(trn.w, "#nsave"));
   ok(await until(() => /Сохранено/.test(text(trn.w, "#nstat"))), "заметка тренера сохранена");

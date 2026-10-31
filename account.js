@@ -77,6 +77,9 @@
     leaderboard: period => api("GET", "/api/leaderboard?period=" + period),
     recordWorkout: w => (state.status === "user" ? api("POST", "/api/workouts", w) : Promise.resolve({ ok: false, status: 0, error: "not-signed-in" })),
     syncWorkouts: items => api("POST", "/api/workouts/sync", { items }),
+    postSession: s => api("POST", "/api/sessions", s),
+    sessions: () => api("GET", "/api/sessions?limit=300"),
+    deleteSession: id => api("DELETE", "/api/sessions/" + id),
     // тарифы и программы
     subscription: () => api("GET", "/api/subscription"),
     redeem: code => api("POST", "/api/subscription/redeem", { code }),
