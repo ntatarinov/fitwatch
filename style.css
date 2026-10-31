@@ -237,3 +237,7 @@ main.enter > *:nth-child(5) { animation-delay:.16s; } main.enter > *:nth-child(6
 @keyframes hl { 0%,100% { box-shadow:0 0 0 0 rgba(34,211,238,0); } 40% { box-shadow:0 0 26px 4px rgba(34,211,238,.45); } }
 .chips button.ghost.on { background:var(--grad); color:var(--on-accent); border-color:transparent; }
 @media (max-width:420px) { .persons { grid-template-columns:1fr; } }
+
+/* ---- тарифы, чат ---- */
+.tier ul { margin:8px 0 0; padding-left:20px; } .tier.cur { border-color:var(--accent); box-shadow:0 0 22px rgba(62,224,164,.18); }
+.chat { max-height:55vh; overflow-y:auto; }

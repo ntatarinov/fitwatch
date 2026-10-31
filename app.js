@@ -15,7 +15,7 @@
   // done/watched — просмотр видео; log — отметки «Я потренировался» [{date,p,d,points,t}];
   // checkins — ежедневный отзыв [{date,energy,mood,barrier,liked,disliked,idea}];
   // food — дневник питания [{date,name,kcal, p,f,c,grams,nid}] (БЖУ может не быть)
-  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null, seen: null, lvl: 0 });
+  const fresh = () => ({ name: "Гость", done: {}, watched: {}, log: [], checkins: [], food: [], kcalGoal: window.KCAL_DEFAULT, me: null, plan: null, seen: null, lvl: 0, sleep: [] });
   function load() {
     try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY))); }
     catch (e) { return fresh(); }
@@ -101,6 +101,7 @@
       daysSinceWorkout: dates.length ? dayNum(today()) - dayNum(dates[dates.length - 1]) : null,
       trainedToday: trainedToday(),
       maxGap: window.STREAK_MAX_GAP,
+      sleepHours: sleepToday() ? sleepToday().hours : null,
     });
   }
   // Первый ещё не пройденный день основных программ (или первый день).
@@ -116,6 +117,14 @@
   }
 
   // ---------- действия (без работы со страницей — их можно проверять тестом) ----------
+  // Сон: одна запись в день (часы и оценка); совет дня учитывает недосып.
+  function saveSleep(hours, quality) {
+    const rec = { date: today(), hours: Math.min(14, Math.max(0, Number(hours) || 0)), quality: Math.min(5, Math.max(1, Math.round(Number(quality)) || 3)) };
+    const i = state.sleep.findIndex(r => r.date === rec.date);
+    if (i >= 0) state.sleep[i] = rec; else state.sleep.push(rec);
+    save();
+  }
+  const sleepToday = () => state.sleep.find(r => r.date === today()) || null;
   function saveCheckin(v) {
     const rec = {
       date: today(),
@@ -200,6 +209,7 @@
       const m = state.me;
       lines.push("", "## Анкета", `Цель: ${labelOf(window.Planner.GOALS, m.goal)} · уровень ${labelOf(window.Catalog.LEVELS, m.level)} · ${m.days} дн. в неделю по ${m.minutes} мин · ${labelOf(window.Planner.PLACES, m.place)}` + (m.limits.length ? ` · ограничения: ${m.limits.map(l => labelOf(window.Catalog.LIMITS, l)).join(", ")}` : ""));
     }
+    if (state.sleep.length) lines.push("", "## Сон (последние записи)", ...state.sleep.slice(-7).map(r => `- ${r.date} · ${r.hours} ч · оценка ${r.quality}/5`));
     lines.push("", "## Отзывы по дням");
     state.checkins.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).forEach(c => {
       lines.push(`- ${c.date} · энергия ${c.energy}, настроение ${c.mood}, мешает: ${labelOf(window.BARRIERS, c.barrier)}` +
@@ -264,6 +274,10 @@
     const go = () => document.querySelectorAll(".xp > i[data-w]").forEach(el => { el.style.width = el.dataset.w + "%"; });
     (window.requestAnimationFrame || (f => setTimeout(f, 30)))(() => (window.requestAnimationFrame || (f => setTimeout(f, 30)))(go));
   }
+  function sleepCardHtml() {
+    const r = sleepToday();
+    return `<a class="card" href="#/sleep"><div class="row"><div><b>😴 Сон</b><div class="muted tiny">${r ? "Сегодня записано: " + r.hours + " ч" : "Запиши, как спал: советы подстроятся"}</div></div><span class="pill">${r ? "Изменить" : "Записать"}</span></div></a>`;
+  }
   function planCardHtml() {
     if (!state.me) return `<div class="card"><b>Твоя цель</b><p class="muted">Расскажи о цели, уровне и ограничениях, и я подберу план тренировок.</p><a class="btn" href="#/me">Подобрать план</a></div>`;
     const dates = state.plan ? state.plan.days.length : 0;
@@ -292,7 +306,7 @@
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
     app.innerHTML = `<div class="greet"><h1>Привет, ${esc(state.name)}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>` +
-      adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
+      adviceHtml() + weekCardHtml() + levelCardHtml() + planCardHtml() + sleepCardHtml() + PAGES.accountCard(FW) + PAGES.ideasCard() + "<h2>Программы</h2><div class='tiles'>" +
       PROGRAMS.map(p => `<a class="tile t-${p.id}" href="#/p/${p.id}"><span class="ic">${p.icon || "🏋️"}</span><b>${esc(p.title)}</b><small>${doneDays(p)}/${p.days.length} дн.</small></a>`).join("") +
       "</div>";
     animateBars();
@@ -303,6 +317,8 @@
       ? `<a class="card" href="#/plan"><div class="row"><div><b>📅 Мой план</b><div class="muted">${esc(labelOf(window.Planner.GOALS, state.me.goal))} · ${state.plan.days.length} дн. в неделю</div></div><span class="pill">Открыть</span></div></a>`
       : `<a class="card" href="#/me"><div class="row"><div><b>📅 Мой план</b><div class="muted">Подберём тренировки под твою цель</div></div><span class="pill">Подобрать</span></div></a>`;
     app.innerHTML = "<h1>Тренировки</h1>" + planLink +
+      `<a class="card" href="#/trainers"><div class="row"><div><b>👥 Тренеры и чат</b><div class="muted">Персональный тренер, переписка, согласие на доступ к данным</div></div><span class="pill">Открыть</span></div></a>` +
+      `<a class="card" href="#/premium"><div class="row"><div><b>💎 Расширенные программы</b><div class="muted">Программы на 4–8 недель по подписке</div></div><span class="pill">Открыть</span></div></a>` +
       `<a class="card" href="#/trainer"><div class="row"><div><b>💬 Тренер</b><div class="muted">Диалог по правилам: цель, питание, самочувствие</div></div><span class="pill">Открыть</span></div></a>` +
       `<a class="card" href="#/library"><div class="row"><div><b>🧍 Каталог упражнений</b><div class="muted">По мышцам, оборудованию и уровню, с моделью тела</div></div><span class="pill">${window.Catalog.EXERCISES.length}</span></div></a>` +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
@@ -496,6 +512,7 @@
     const history = state.log.slice().reverse().map(l => {
       if (l.p === "plan") return `<li>${esc(l.date)} · Мой план · ${esc(l.t || l.d)} · +${l.points}</li>`;
       const p = PROGRAMS.find(x => x.id === l.p), d = p && p.days.find(x => x.id === l.d);
+      if (!p) return `<li>${esc(l.date)} · ${esc(l.t || l.p + "/" + l.d)} · +${l.points}</li>`;
       return `<li>${esc(l.date)} · ${esc(p ? p.title : l.p)} · ${esc(d ? d.title : l.d)} · +${l.points}</li>`;
     }).join("");
     app.innerHTML = `<h1>Профиль</h1>
@@ -548,6 +565,7 @@
 
   // ---------- роутер ----------
   function route() {
+    if (PAGES._cleanup) PAGES._cleanup(); // остановить опрос чата и подобное
     app.classList.remove("enter"); void app.offsetWidth; app.classList.add("enter");
     stopPlayer();
     ytCallbacks = [];
@@ -561,6 +579,16 @@
     else if (a === "library") PAGES.library(FW, b);
     else if (a === "x") PAGES.exercise(FW, b);
     else if (a === "ideas") PAGES.ideas(FW, b);
+    else if (a === "sleep") PAGES.sleep(FW);
+    else if (a === "tariffs") PAGES.tariffs(FW);
+    else if (a === "premium") PAGES.premium(FW);
+    else if (a === "pp") PAGES.premiumProgram(FW, b);
+    else if (a === "ppd") PAGES.premiumDay(FW, b, c);
+    else if (a === "trainers") PAGES.trainers(FW);
+    else if (a === "coach") PAGES.coach(FW);
+    else if (a === "client") PAGES.clientView(FW, b);
+    else if (a === "chat") PAGES.chat(FW, b);
+    else if (a === "admin") PAGES.admin(FW);
     else if (a === "account") PAGES.account(FW, b);
     else if (a === "rating") PAGES.rating(FW, b);
     else if (a === "body") PAGES.body(FW, b);
@@ -570,13 +598,13 @@
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "programs", client: "programs", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     window.scrollTo(0, 0);
   }
   // Контекст для страниц из pages.js: состояние берётся при каждом обращении (оно заменяется при сбросе и демо).
   const PAGES = window.PAGES;
-  const FW = { app, esc, today, k, get state() { return state; }, save, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
+  const FW = { app, esc, today, k, get state() { return state; }, save, saveSleep, notFound, renderExercise, renderCheckin, go: h => { location.hash = h; } };
   const snd = document.getElementById("snd");
   const paintSnd = () => { const on = window.FX.enabled(); snd.textContent = on ? "🔊" : "🔇"; snd.setAttribute("aria-pressed", String(on)); snd.title = on ? "Звук включён" : "Звук выключен"; };
   snd.onclick = () => { window.FX.setEnabled(!window.FX.enabled()); paintSnd(); window.FX.play("tap"); };

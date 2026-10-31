@@ -70,6 +70,26 @@
     leaderboard: period => api("GET", "/api/leaderboard?period=" + period),
     recordWorkout: w => (state.status === "user" ? api("POST", "/api/workouts", w) : Promise.resolve({ ok: false, status: 0, error: "not-signed-in" })),
     syncWorkouts: items => api("POST", "/api/workouts/sync", { items }),
+    // тарифы и программы
+    subscription: () => api("GET", "/api/subscription"),
+    redeem: code => api("POST", "/api/subscription/redeem", { code }),
+    programs: () => api("GET", "/api/programs"),
+    // тренеры и переписка
+    trainerMe: () => api("GET", "/api/trainer/me"),
+    trainerApply: (bio, specialties) => api("POST", "/api/trainer/apply", { bio, specialties }),
+    trainers: () => api("GET", "/api/trainers"),
+    requestTrainer: (id, note) => api("POST", "/api/trainers/" + id + "/request", note ? { note } : {}),
+    links: () => api("GET", "/api/links"),
+    linkAction: (id, action) => api("POST", "/api/links/" + id + "/" + action, {}),
+    setShare: (id, v) => api("PATCH", "/api/links/" + id + "/share", v),
+    clientView: id => api("GET", "/api/links/" + id + "/client"),
+    messages: (id, after) => api("GET", "/api/links/" + id + "/messages?after=" + (after || 0)),
+    sendMessage: (id, body) => api("POST", "/api/links/" + id + "/messages", { body }),
+    // администратор
+    adminTrainers: status => api("GET", "/api/admin/trainers?status=" + status),
+    adminVerdict: (id, action) => api("POST", "/api/admin/trainers/" + id + "/" + action, {}),
+    adminPromoCreate: v => api("POST", "/api/admin/promo", v),
+    adminPromoList: () => api("GET", "/api/admin/promo"),
   };
   root.Account = A;
   if (typeof module !== "undefined" && module.exports) module.exports = A;

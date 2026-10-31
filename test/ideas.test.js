@@ -7,10 +7,10 @@ test("в списке 14 идей Сани и 11 идей Айдархана, и
   assert.equal(new Set(I.ITEMS.map(i => i.id)).size, I.ITEMS.length);
 });
 
-test("итоги совпадают с документом 07: Саня 5/5/4 → 54%, Айдархан 0/3/8 → 14%", () => {
+test("итоги совпадают с документом 07: Саня 7/6/1 → 71%, Айдархан 0/4/7 → 18%", () => {
   const s = I.summary(I.forWho("sanya")), a = I.summary(I.forWho("aidarkhan"));
-  assert.deepEqual([s.ready, s.partial, s.notDone, s.pct, s.strictPct], [5, 5, 4, 54, 36]);
-  assert.deepEqual([a.ready, a.partial, a.notDone, a.pct, a.strictPct], [0, 3, 8, 14, 0]);
+  assert.deepEqual([s.ready, s.partial, s.notDone, s.pct, s.strictPct], [7, 6, 1, 71, 50]);
+  assert.deepEqual([a.ready, a.partial, a.notDone, a.pct, a.strictPct], [0, 4, 7, 18, 0]);
   assert.deepEqual(I.summary([]), { total: 0, ready: 0, partial: 0, planned: 0, later: 0, notDone: 0, pct: 0, strictPct: 0 });
 });
 
@@ -25,7 +25,7 @@ test("у каждой идеи заполнены название, метка �
 test("готовые и частично готовые идеи описывают, что сделано, и ведут на экран приложения", () => {
   I.ITEMS.filter(i => i.status === "ready" || i.status === "partial").forEach(i => {
     assert.ok(i.done.length > 10, i.id + ": что сделано");
-    assert.match(i.where, /^#\/(library|me|food|trainer|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
+    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
   });
   I.ITEMS.filter(i => i.status === "planned" || i.status === "later").forEach(i => assert.ok(i.when.length > 3 || i.done.length > 0, i.id + ": когда"));
 });
@@ -38,9 +38,10 @@ test("запланированное не выдаётся за сделанно
 
 test("главные просьбы Айдархана (К1–К6): статусы честные, готовое ведёт на экран", () => {
   assert.deepEqual(I.PRIORITIES.map(i => i.id), ["K1", "K2", "K3", "K4", "K5", "K6"]);
-  assert.deepEqual(I.PRIORITIES.map(i => i.status), ["partial", "partial", "ready", "planned", "partial", "planned"]);
+  assert.deepEqual(I.PRIORITIES.map(i => i.status), ["ready", "partial", "ready", "ready", "ready", "ready"]);
   I.PRIORITIES.filter(i => i.done).forEach(i => assert.ok(i.where, i.id));
   I.PRIORITIES.filter(i => !i.done).forEach(i => assert.equal(i.where, "", i.id + ": запланированное не должно вести на экран"));
+  assert.ok(I.PRIORITIES.every(i => i.status === "ready" || i.status === "partial" || !i.where));
   assert.equal(I.byId("K5").chip, "данные, бонусы, рейтинг");
   assert.equal(I.summary(I.forWho("aidarkhan")).total, 11); // К-пункты не входят в проценты
 });

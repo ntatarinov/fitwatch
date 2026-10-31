@@ -345,4 +345,29 @@
     FW.app.querySelectorAll("#ideafilters [data-st]").forEach(b => b.onclick = () => { ideasUi.status = b.dataset.st; draw(); });
     if (focus) { const el = document.getElementById("idea-" + focus); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" }); }
   };
+  // ---------- сон ----------
+  const sleepAdvice = avg => avg == null ? "" : avg < 6 ? "В среднем меньше 6 часов: восстановление страдает. Сдвинь отбой раньше и в такие дни выбирай лёгкие тренировки."
+    : avg < 7 ? "Почти норма. Взрослым обычно нужно 7–9 часов: попробуй ложиться на 30 минут раньше."
+    : avg <= 9 ? "Хороший сон: мышцам хватает времени восстановиться." : "Много сна. Если при этом нет бодрости, обсуди это с врачом.";
+  P.sleep = function (FW) {
+    const { app, esc } = FW, st = FW.state;
+    const rows = (st.sleep || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 7);
+    const avg = rows.length ? Math.round(rows.reduce((s, r) => s + r.hours, 0) / rows.length * 10) / 10 : null;
+    const q = ["", "плохо", "так себе", "нормально", "хорошо", "отлично"];
+    app.innerHTML = `<a class="back" href="#/">← Главная</a><h1>Сон</h1>${P.ideaChips(["A9"])}
+      <p class="muted">Запиши, сколько ты спал прошлой ночью. Если сна меньше 6 часов, совет дня предложит лёгкую тренировку.</p>
+      <form id="sform" class="card"><div class="row" style="gap:8px"><div><label class="muted">Часов</label><input name="hours" type="number" min="0" max="14" step="0.5" value="7.5" style="width:100px"></div>
+        <div style="flex:1"><label class="muted">Как выспался</label><select name="q" style="width:100%">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === 3 ? "selected" : ""}>${n} · ${q[n]}</option>`).join("")}</select></div></div>
+        <div class="status" id="serr" role="alert"></div><button class="wide" type="submit">Записать сон за сегодня</button></form>
+      ${avg != null ? `<div class="card"><div class="row"><div><div class="big">${avg}</div><div class="muted">ч в среднем за ${rows.length} дн.</div></div></div><p class="muted">${esc(sleepAdvice(avg))}</p></div>` : ""}
+      ${rows.map(r => `<div class="card row"><span>${esc(r.date)}</span><span><b>${r.hours}</b> ч · ${esc(q[r.quality] || "")}</span></div>`).join("")}
+      <p class="muted tiny">Это дневник, а не медицинская рекомендация. Постоянные проблемы со сном стоит обсудить с врачом.</p>`;
+    document.getElementById("sform").onsubmit = ev => {
+      ev.preventDefault();
+      const f = ev.target.elements, h = Math.round(Number(f.hours.value) * 2) / 2, qq = Math.round(Number(f.q.value));
+      if (!(h >= 0 && h <= 14) || !(qq >= 1 && qq <= 5)) { document.getElementById("serr").textContent = "Часы: от 0 до 14, оценка от 1 до 5."; return; }
+      FW.saveSleep(h, qq);
+      P.sleep(FW);
+    };
+  };
 })();

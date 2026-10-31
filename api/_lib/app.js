@@ -59,7 +59,16 @@ async function userFromCookie(db, cookies) {
   const u = rows[0];
   return { id: u.id, email: u.email, name: u.display_name, role: u.role, ratingOptIn: !!u.rating_opt_in };
 }
-const publicUser = u => ({ email: u.email, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn });
+const adminList = () => String(process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
+const isAdmin = u => !!u && adminList().includes(String(u.email).toLowerCase());
+const publicUser = u => ({ email: u.email, name: u.name, role: u.role, ratingOptIn: u.ratingOptIn, isAdmin: isAdmin(u) });
+
+// Тариф человека: free, premium или personal; действует до даты until.
+const TIER_RANK = { free: 0, premium: 1, personal: 2 };
+async function tierOf(db, userId) {
+  const r = await db.query("SELECT tier, until FROM subscriptions WHERE user_id = $1 AND until > now()", [userId]);
+  return r.length ? { tier: r[0].tier, until: new Date(r[0].until).toISOString() } : { tier: "free", until: null };
+}
 
 async function tooMany(db, keys, limit, minutes) {
   const rows = await db.query(
@@ -104,7 +113,7 @@ async function saveProfile(db, userId, fields) {
 
 // ---- маршруты ----
 const routes = [];
-const route = (method, pattern, fn) => routes.push({ method, re: new RegExp("^" + pattern.replace(/:id/g, "([0-9]+)") + "$"), fn });
+const route = (method, pattern, fn) => routes.push({ method, re: new RegExp("^" + pattern.replace(/:uuid/g, "([0-9a-fA-F-]{36})").replace(/:id/g, "([0-9]+)") + "$"), fn });
 const needUser = ctx => { if (!ctx.user) throw new HttpError(401, "Нужно войти"); return ctx.user; };
 
 route("GET", "/api/health", async ctx => ({ status: 200, body: { ok: true, db: true, time: ctx.now.toISOString() } }));
@@ -272,6 +281,11 @@ route("GET", "/api/leaderboard", async ctx => {
      ORDER BY rank, workouts DESC, name`, [since, me]);
   return { status: 200, body: { period, since, items: rows.map(r => ({ rank: Number(r.rank), name: r.name, points: Number(r.points), workouts: Number(r.workouts), me: me !== null && r.id === me })) } };
 });
+
+// ---- тарифы и тренеры (отдельные модули, общий набор помощников) ----
+const kit = { route, HttpError, bad, needUser, V, S, tierOf, TIER_RANK, isAdmin };
+require("./subscriptions").install(kit);
+require("./trainers").install(kit);
 
 // ---- вход в обработку ----
 async function handle(req, opts) {

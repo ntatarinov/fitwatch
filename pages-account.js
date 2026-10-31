@@ -24,7 +24,7 @@
     const s = A().state, esc = FW.esc;
     if (s.status === "user") {
       return '<div class="card"><div class="row"><div><b>👤 ' + esc(s.user.name) + '</b><div class="muted tiny">Очки в рейтинге: ' + s.stats.points + ' · серия ' + s.stats.streak + '</div></div><a class="pill" href="#/account">Аккаунт</a></div>' +
-        '<div class="row" style="margin-top:10px;gap:8px"><a class="btn" href="#/rating">Рейтинг</a><a class="btn ghost-btn" href="#/body">Мои данные</a></div></div>';
+        '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><a class="btn" href="#/rating">Рейтинг</a><a class="btn ghost-btn" href="#/body">Мои данные</a><a class="btn ghost-btn" href="#/tariffs">Тарифы</a>' + (s.user.isAdmin ? '<a class="btn ghost-btn" href="#/admin">Администратор</a>' : '') + '</div></div>';
     }
     if (s.status === "offline") return '<div class="card"><b>Аккаунт</b><p class="muted">Рейтинг и история веса появятся, когда подключится сервер. Приложение работает и так.</p></div>';
     if (s.status === "anon") return '<div class="card"><b>Рейтинг и мои данные</b><p class="muted">Войди, чтобы соревноваться в рейтинге, вести историю веса и роста и получать бонусы за серию.</p><a class="btn" href="#/account">Войти или зарегистрироваться</a></div>';

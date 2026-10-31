@@ -172,10 +172,10 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   // 7c. идеи команды
   await go(w, "#/ideas");
   ok(/Идеи команды/.test(text(w, "h1")) && $$(w, ".person").length === 2, "идеи: два участника");
-  ok(/54%/.test(text(w, ".persons")) && /14%/.test(text(w, ".persons")), "идеи: проценты 54% и 14%");
+  ok(/71%/.test(text(w, ".persons")) && /18%/.test(text(w, ".persons")), "идеи: проценты 71% и 18%");
   ok($$(w, "#ideaslist .idea").length === 25 && $$(w, ".idea.st-ready").length >= 6, "идеи: 25 идей, готовые отмечены");
   click(w, $(w, '[data-st="ready"]'));
-  ok($$(w, "#ideaslist .idea").length === 5 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 5");
+  ok($$(w, "#ideaslist .idea").length === 7 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 7");
   click(w, $(w, '[data-who="aidarkhan"]'));
   ok($$(w, "#ideaslist .idea").length === 0, "идеи: у Айдархана готовых нет");
   click(w, $(w, '[data-st=""]')); click(w, $(w, '[data-who=""]'));
@@ -190,6 +190,18 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok(!!$(w, ".idea-chip"), "на экране каталога есть метка идеи команды");
   await go(w, "#/");
   ok(/Идеи команды/.test(text(w, "main")), "главная ведёт в «Идеи команды»");
+
+  // 7d. сон
+  await go(w, "#/sleep");
+  ok(/Сон/.test(text(w, "h1")) && !!$(w, "#sform"), "сон: страница открылась");
+  const sf = $(w, "#sform").elements; sf.hours.value = "5"; sf.q.value = "2";
+  $(w, "#sform").dispatchEvent(new w.Event("submit", { cancelable: true, bubbles: true }));
+  await tick(w, 30);
+  ok(state(w).sleep.length === 1 && state(w).sleep[0].hours === 5 && /5\s*ч|5<\/b> ч/.test(w.document.body.innerHTML), "сон: запись сохранена");
+  await go(w, "#/checkin");
+  await go(w, "#/");
+  ok(/Сегодня мягко: мало сна|Ты спал меньше 6 часов|уже засчитана|Сегодня всё сделано/.test(text(w, ".hero")), "совет дня учитывает недосып (или тренировка уже была)");
+  ok(/😴 Сон/.test(text(w, "main")), "на главной есть карточка сна");
 
   // 8. старые маршруты работают
   for (const h of ["#/programs", "#/p/start", "#/d/start/d1", "#/e/start/squat", "#/trainer", "#/checkin", "#/plan"]) {

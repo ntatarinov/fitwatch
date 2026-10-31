@@ -61,6 +61,63 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS workouts_day ON workouts(day)`,
     ],
   },
+  {
+    version: 2,
+    name: "trainers, links, messages, subscriptions, promo codes",
+    sql: [
+      `CREATE TABLE IF NOT EXISTS trainer_profiles (
+         user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+         bio text NOT NULL CHECK (char_length(bio) BETWEEN 20 AND 1000),
+         specialties text NOT NULL DEFAULT '' CHECK (char_length(specialties) <= 200),
+         status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+         created_at timestamptz NOT NULL DEFAULT now(),
+         decided_at timestamptz
+       )`,
+      `CREATE TABLE IF NOT EXISTS trainer_links (
+         id bigserial PRIMARY KEY,
+         client_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         trainer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         status text NOT NULL DEFAULT 'requested' CHECK (status IN ('requested','active','declined','ended')),
+         share_goals boolean NOT NULL DEFAULT false,
+         share_results boolean NOT NULL DEFAULT false,
+         note text,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         updated_at timestamptz NOT NULL DEFAULT now(),
+         CHECK (client_id <> trainer_id)
+       )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS trainer_links_open ON trainer_links(client_id, trainer_id) WHERE status IN ('requested','active')`,
+      `CREATE INDEX IF NOT EXISTS trainer_links_trainer ON trainer_links(trainer_id)`,
+      `CREATE TABLE IF NOT EXISTS messages (
+         id bigserial PRIMARY KEY,
+         link_id bigint NOT NULL REFERENCES trainer_links(id) ON DELETE CASCADE,
+         sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+         created_at timestamptz NOT NULL DEFAULT now()
+       )`,
+      `CREATE INDEX IF NOT EXISTS messages_link ON messages(link_id, id)`,
+      `CREATE TABLE IF NOT EXISTS subscriptions (
+         user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+         tier text NOT NULL CHECK (tier IN ('premium','personal')),
+         until timestamptz NOT NULL,
+         source text NOT NULL DEFAULT 'promo',
+         updated_at timestamptz NOT NULL DEFAULT now()
+       )`,
+      `CREATE TABLE IF NOT EXISTS promo_codes (
+         code text PRIMARY KEY CHECK (code ~ '^[A-Z0-9-]{4,24}$'),
+         tier text NOT NULL CHECK (tier IN ('premium','personal')),
+         days int NOT NULL CHECK (days BETWEEN 1 AND 366),
+         max_uses int NOT NULL CHECK (max_uses BETWEEN 1 AND 1000),
+         used int NOT NULL DEFAULT 0 CHECK (used >= 0),
+         created_at timestamptz NOT NULL DEFAULT now()
+       )`,
+      `CREATE TABLE IF NOT EXISTS promo_redemptions (
+         code text NOT NULL REFERENCES promo_codes(code) ON DELETE CASCADE,
+         user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         at timestamptz NOT NULL DEFAULT now(),
+         PRIMARY KEY (code, user_id)
+       )`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };

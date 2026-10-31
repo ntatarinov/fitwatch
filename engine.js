@@ -103,12 +103,15 @@
     },
   };
 
-  // in: { profile, today: checkin|null, daysSinceWorkout: int|null, trainedToday: bool, maxGap: int }
+  // in: { profile, today: checkin|null, daysSinceWorkout: int|null, trainedToday: bool, maxGap: int, sleepHours: число|null }
   // out: { kind: done|checkin|light|start|return|go, title, text }
   function advice(c) {
     const tone = TONE[(c.profile && c.profile.ready && c.profile.type) || "none"];
     if (c.trainedToday) {
       return { kind: "done", title: "Сегодня всё сделано", text: "Тренировка засчитана. Отдых — часть программы: следующая завтра или через день." };
+    }
+    if (c.sleepHours != null && c.sleepHours < 6) {
+      return { kind: "light", title: "Сегодня мягко: мало сна", text: "Ты спал меньше 6 часов. Организму нужно восстановиться: сегодня лёгкая растяжка вместо тяжёлой тренировки, а вечером ляг пораньше." };
     }
     if (!c.today) {
       return { kind: "checkin", title: "Минута на отзыв", text: "Скажи, как ты сегодня. От этого зависит, какую нагрузку я предложу." };

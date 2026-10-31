@@ -1,0 +1,171 @@
+// Сквозная проверка тренеров, тарифов и закрытых программ: четыре «браузера» (администратор, тренер, клиент, посторонний)
+// работают через интерфейс с общей базой PGlite. Запуск: npm i --no-save jsdom @electric-sql/pglite && node test-ui/trainer-flow.js
+process.env.ADMIN_EMAILS = "admin@test.kz";
+const fs = require("fs"), path = require("path");
+const { JSDOM, VirtualConsole } = require("jsdom");
+const ROOT = path.join(__dirname, "..");
+const { handle } = require(path.join(ROOT, "api/_lib/app.js"));
+const { migrate } = require(path.join(ROOT, "api/_lib/db.js"));
+
+let n = 0, failed = 0;
+const ok = (c, name) => { n++; if (!c) { failed++; console.log("FAIL:", name); } else console.log("ok  :", name); };
+const tick = (ms = 10) => new Promise(r => setTimeout(r, ms));
+const until = async (f, ms = 3000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (f()) return true; } catch (e) { /* ждём */ } await tick(15); } return false; };
+
+function openApp(db, ip) {
+  let html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => "<script>" + fs.readFileSync(path.join(ROOT, src), "utf8").replace(/<\/script>/g, "<\\/script>") + "</script>");
+  const errors = [], vc = new VirtualConsole();
+  vc.on("jsdomError", e => errors.push(String(e.stack || e).split("\n")[0])); vc.on("error", e => errors.push(String(e)));
+  let cookie = "";
+  const dom = new JSDOM(html, {
+    url: "http://localhost/", runScripts: "dangerously", pretendToBeVisual: true, virtualConsole: vc,
+    beforeParse(w) {
+      w.scrollTo = () => {}; w.HTMLCanvasElement.prototype.getContext = () => null;
+      w.fetch = async (url, init) => {
+        init = init || {};
+        const u = new URL(url, "http://localhost"), headers = { host: "localhost", "x-forwarded-for": ip };
+        Object.keys(init.headers || {}).forEach(k => { headers[k.toLowerCase()] = init.headers[k]; });
+        if (cookie) headers.cookie = cookie;
+        const res = await handle({ method: init.method || "GET", path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body ? JSON.parse(init.body) : undefined, headers }, { db });
+        (res.cookies || []).forEach(sc => { const [k, v] = sc.split(";")[0].split("="); cookie = v === "" ? "" : k + "=" + v; });
+        return { ok: res.status < 400, status: res.status, json: async () => res.body };
+      };
+    },
+  });
+  dom.window.alert = () => {}; dom.window.confirm = () => true;
+  return { w: dom.window, errors };
+}
+const $ = (w, s) => w.document.querySelector(s), $$ = (w, s) => Array.from(w.document.querySelectorAll(s));
+const text = (w, s) => ($(w, s) || { textContent: "" }).textContent;
+const go = async (w, h) => { w.location.hash = h; await tick(60); };
+const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+const submit = (w, form) => form.dispatchEvent(new w.Event("submit", { cancelable: true, bubbles: true }));
+// Повторное открытие той же страницы: сначала уходим на главную (браузер не перерисовывает тот же адрес).
+const reopen = async (w, h) => { w.location.hash = "#/"; await tick(40); await go(w, h); };
+const change = (w, el) => el.dispatchEvent(new w.Event("change", { bubbles: true }));
+async function register(w, name, email) {
+  await go(w, "#/account/register");
+  const f = $(w, "#acform").elements; f.name.value = name; f.email.value = email; f.password.value = "password-123"; f.consent.checked = true;
+  submit(w, $(w, "#acform"));
+  await until(() => w.Account.state.status === "user");
+}
+
+(async () => {
+  const { PGlite } = await import("@electric-sql/pglite");
+  const pg = new PGlite();
+  const db = { query: async (t, p) => (await pg.query(t, p || [])).rows };
+  await migrate(db);
+  const adm = openApp(db, "10.5.0.1"), trn = openApp(db, "10.5.0.2"), cli = openApp(db, "10.5.0.3"), str = openApp(db, "10.5.0.4");
+  await tick(100);
+  await register(adm.w, "Админ", "admin@test.kz"); await register(trn.w, "Тренер Марат", "marat@test.kz");
+  await register(cli.w, "Клиент Дана", "dana@test.kz"); await register(str.w, "Посторонний", "stranger@test.kz");
+  ok(adm.w.Account.state.user.isAdmin === true && cli.w.Account.state.user.isAdmin === false, "администратор определяется по почте из настроек");
+
+  // ---- заявка тренера и подтверждение ----
+  await go(trn.w, "#/trainers");
+  ok(await until(() => !!$(trn.w, "#apply")), "тренер: форма заявки");
+  const ap = $(trn.w, "#apply").elements; ap.bio.value = "коротко"; submit(trn.w, $(trn.w, "#apply"));
+  ok(await until(() => /от 20 до 1000/.test(text(trn.w, "#aerr"))), "тренер: короткое описание отклонено");
+  $(trn.w, "#apply").elements.bio.value = "Тренер по силовым, 8 лет опыта, работаю с новичками."; $(trn.w, "#apply").elements.spec.value = "сила, масса";
+  submit(trn.w, $(trn.w, "#apply"));
+  ok(await until(() => /на проверке/.test(text(trn.w, "main"))), "тренер: заявка на проверке");
+  await go(cli.w, "#/admin"); ok(/Нет доступа/.test(text(cli.w, "main")), "клиенту панель администратора недоступна");
+  await go(adm.w, "#/admin");
+  ok(await until(() => /Заявки тренеров \(1\)/.test(text(adm.w, "main")) && /Тренер Марат/.test(text(adm.w, "main"))), "администратор видит заявку");
+  click(adm.w, $(adm.w, '[data-v="approve"]'));
+  ok(await until(() => /Заявки тренеров \(0\)/.test(text(adm.w, "main"))), "администратор подтвердил тренера");
+  const pf = $(adm.w, "#pform").elements; pf.tier.value = "premium"; pf.days.value = "30"; pf.max.value = "2"; pf.code.value = "e2e-prem";
+  submit(adm.w, $(adm.w, "#pform"));
+  ok(await until(() => /E2E-PREM/.test(text(adm.w, "main"))), "администратор создал код «Премиум»");
+  const pf2 = $(adm.w, "#pform").elements; pf2.tier.value = "personal"; pf2.days.value = "30"; pf2.max.value = "1"; pf2.code.value = "e2e-pers";
+  submit(adm.w, $(adm.w, "#pform"));
+  ok(await until(() => /E2E-PERS/.test(text(adm.w, "main"))), "администратор создал код «Персональный тренер»");
+
+  // ---- тариф и закрытые программы ----
+  await go(cli.w, "#/premium");
+  ok(await until(() => $$(cli.w, 'a.card[href="#/tariffs"]').length >= 4 && /по подписке/.test(text(cli.w, "main"))), "бесплатный клиент: все программы закрыты");
+  await go(cli.w, "#/pp/mass4");
+  ok(await until(() => /открывается по подписке/.test(text(cli.w, "main"))) && !/Жим гантелей/.test(text(cli.w, "main")), "содержимое закрытой программы не показано");
+  await go(cli.w, "#/tariffs");
+  ok(await until(() => /Сейчас: Бесплатный/.test(text(cli.w, "main"))), "тарифы: бесплатный");
+  $(cli.w, "#promo").elements.code.value = "no-such"; submit(cli.w, $(cli.w, "#promo"));
+  ok(await until(() => /не найден/.test(text(cli.w, "#perr"))), "неверный код отклонён");
+  $(cli.w, "#promo").elements.code.value = "E2E-PREM"; submit(cli.w, $(cli.w, "#promo"));
+  ok(await until(() => /Сейчас: Премиум/.test(text(cli.w, "main"))), "промокод дал «Премиум»");
+  await go(cli.w, "#/premium");
+  ok(await until(() => $$(cli.w, 'a.card[href^="#/pp/"]').length === 4), "премиум: открыты 4 программы");
+  await go(cli.w, "#/pp/mass4");
+  ok(await until(() => !!$(cli.w, "#wk")) && /Неделя 1/.test(text(cli.w, "main")) && /3 × 12/.test(text(cli.w, "main")), "программа: неделя 1, 3 × 12");
+  $(cli.w, "#wk").value = "4"; change(cli.w, $(cli.w, "#wk"));
+  ok(await until(() => /4 × 10/.test(text(cli.w, "main"))), "программа: неделя 4, нагрузка выросла до 4 × 10");
+  await go(cli.w, "#/ppd/mass4/d1");
+  ok(await until(() => !!$(cli.w, "#done")) && $$(cli.w, ".card .pill").length >= 6, "день программы открылся");
+  click(cli.w, $(cli.w, "#done")); await tick(250);
+  const wk = (await db.query("SELECT program, day_id FROM workouts w JOIN users u ON u.id = w.user_id WHERE u.email = 'dana@test.kz'"))[0];
+  ok(wk && wk.program === "pp-mass4" && wk.day_id === "d1", "тренировка по расширенной программе записана на сервере");
+
+  // ---- запрос тренеру и чат ----
+  await go(cli.w, "#/trainers");
+  ok(await until(() => /Тренер Марат/.test(text(cli.w, "main")) && /Нужна подписка «Персональный тренер»/.test(text(cli.w, "main"))) && !$(cli.w, "[data-req]"), "с «Премиум» запрос тренеру закрыт: нужна подписка «Персональный тренер»");
+  await go(cli.w, "#/tariffs");
+  await until(() => !!$(cli.w, "#promo"));
+  $(cli.w, "#promo").elements.code.value = "E2E-PERS"; submit(cli.w, $(cli.w, "#promo"));
+  ok(await until(() => /Сейчас: Персональный тренер/.test(text(cli.w, "main"))), "клиент получил «Персональный тренер»");
+  await cli.w.Account.saveProfile({ goal: "muscle", level: 2, days: 4, minutes: 45, place: "gym", limits: ["knees"] });
+  await go(cli.w, "#/trainers");
+  ok(await until(() => !!$(cli.w, "[data-req]")), "появилась кнопка «Запросить»");
+  $(cli.w, "[data-note]").value = "Хочу набрать массу"; click(cli.w, $(cli.w, "[data-req]"));
+  ok(await until(() => /Ждёт ответа/.test(text(cli.w, "main"))), "запрос отправлен");
+  await go(str.w, "#/trainers");
+  ok(await until(() => /Нужна подписка «Персональный тренер»/.test(text(str.w, "main"))), "посторонний без тарифа не может запросить тренера");
+  await go(trn.w, "#/coach");
+  ok(await until(() => /Новые запросы \(1\)/.test(text(trn.w, "main")) && /Хочу набрать массу/.test(text(trn.w, "main"))), "тренер видит запрос с сообщением клиента");
+  click(trn.w, $(trn.w, '[data-act="accept"]'));
+  ok(await until(() => /Мои клиенты \(1\)/.test(text(trn.w, "main"))), "тренер принял запрос");
+  const linkId = $(trn.w, 'a[href^="#/chat/"]').getAttribute("href").split("/")[2];
+  await go(trn.w, "#/chat/" + linkId);
+  ok(await until(() => !!$(trn.w, "#mform")), "тренер открыл чат");
+  $(trn.w, "#mform").elements.body.value = "Здравствуйте, Дана! Расскажите про опыт тренировок."; submit(trn.w, $(trn.w, "#mform"));
+  ok(await until(() => /Здравствуйте, Дана/.test(text(trn.w, "#msgs"))), "тренер: своё сообщение показано");
+  await go(cli.w, "#/chat/" + linkId);
+  ok(await until(() => /Здравствуйте, Дана/.test(text(cli.w, "#msgs"))) && $$(cli.w, ".msg.me").length === 0, "клиент видит сообщение тренера");
+  $(cli.w, "#mform").elements.body.value = "Занимаюсь полгода, хочу план."; submit(cli.w, $(cli.w, "#mform"));
+  ok(await until(() => $$(cli.w, ".msg.me").length === 1), "клиент ответил");
+  await reopen(trn.w, "#/chat/" + linkId);
+  ok(await until(() => /Занимаюсь полгода/.test(text(trn.w, "#msgs"))), "тренер видит ответ клиента");
+  await go(str.w, "#/chat/" + linkId);
+  ok(await until(() => /Не найдено/.test(text(str.w, "main"))), "посторонний не видит чужой чат");
+
+  // ---- согласие на доступ к данным ----
+  await reopen(trn.w, "#/client/" + linkId);
+  ok(await until(() => /не открыл доступ к целям/.test(text(trn.w, "main")) && /не открыл доступ к результатам/.test(text(trn.w, "main"))), "по умолчанию тренер ничего не видит");
+  await go(cli.w, "#/chat/" + linkId);
+  await until(() => !!$(cli.w, "#sg"));
+  $(cli.w, "#sg").checked = true; change(cli.w, $(cli.w, "#sg")); await tick(150);
+  await reopen(trn.w, "#/client/" + linkId);
+  ok(await until(() => /Набор массы|Набрать мышечную массу/.test(text(trn.w, "main")) && /колени/i.test(text(trn.w, "main"))) && /не открыл доступ к результатам/.test(text(trn.w, "main")), "после согласия на цели тренер видит цели и ограничения, но не результаты");
+  await go(cli.w, "#/chat/" + linkId);
+  await until(() => !!$(cli.w, "#sr"));
+  $(cli.w, "#sr").checked = true; change(cli.w, $(cli.w, "#sr")); await tick(150);
+  await reopen(trn.w, "#/client/" + linkId);
+  ok(await until(() => /Тренировки/.test(text(trn.w, "main")) && /Замеры/.test(text(trn.w, "main")) && !/не открыл доступ к результатам/.test(text(trn.w, "main"))), "после согласия на результаты они видны");
+  await go(cli.w, "#/chat/" + linkId);
+  await until(() => !!$(cli.w, "#sg"));
+  $(cli.w, "#sg").checked = false; change(cli.w, $(cli.w, "#sg")); $(cli.w, "#sr").checked = false; change(cli.w, $(cli.w, "#sr")); await tick(150);
+  await reopen(trn.w, "#/client/" + linkId);
+  ok(await until(() => /не открыл доступ к целям/.test(text(trn.w, "main")) && /не открыл доступ к результатам/.test(text(trn.w, "main"))), "согласие отозвано: данные снова закрыты");
+
+  // ---- завершение ----
+  await go(cli.w, "#/trainers");
+  await until(() => !!$(cli.w, "[data-end]"));
+  click(cli.w, $(cli.w, "[data-end]"));
+  ok(await until(() => /Завершён/.test(text(cli.w, "main"))), "клиент завершил связь");
+  await go(trn.w, "#/chat/" + linkId);
+  ok(await until(() => /только для чтения/.test(text(trn.w, "main"))) && !$(trn.w, "#mform"), "после завершения переписка только для чтения");
+
+  const errs = adm.errors.concat(trn.errors, cli.errors, str.errors);
+  ok(errs.length === 0, "ошибок скриптов нет: " + errs.slice(0, 3).join(" | "));
+  console.log(`\nпроверок: ${n}, не прошло: ${failed}`);
+  process.exit(failed ? 1 : 0);
+})().catch(e => { console.error("СБОЙ СЦЕНАРИЯ:", e); process.exit(2); });
