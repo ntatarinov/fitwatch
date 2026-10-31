@@ -8,6 +8,11 @@
   const Tree = window.Tree;
   const LIB_POINTS = 5; // баллы за просмотр видео упражнения из каталога
   window.Catalog.resolve(PROGRAMS);
+  // Программы из упражнений каталога получают их технику и видео (без копий в data.js). Баллы за просмотр видео как в остальных программах.
+  PROGRAMS.forEach(p => (p.catalog || []).forEach(id => {
+    const e = window.Catalog.byId(id);
+    if (e && !p.exercises.some(x => x.id === id)) p.exercises.push({ id, title: e.title, video: e.video, points: 5, summary: e.summary, steps: e.steps, mistakes: e.mistakes, dose: e.dose });
+  }));
 
   // ---------- состояние профиля (localStorage) ----------
   // seen — открытые достижения, о которых уже сказали; lvl — последний показанный уровень (null/0 — ещё не отмечено)
@@ -137,7 +142,7 @@
       const n = state.log.filter(l => l.p === "plan" && l.date >= state.plan.builtAt).length;
       return "#/pd/" + state.plan.days[n % state.plan.days.length].id;
     }
-    for (const p of PROGRAMS.filter(x => x.id !== "stretch")) {
+    for (const p of PROGRAMS.filter(x => x.id !== "stretch" && !x.optional)) {
       for (const d of p.days) if (!state.log.some(l => l.p === p.id && l.d === d.id)) return `#/d/${p.id}/${d.id}`;
     }
     return "#/d/start/d1";
@@ -396,6 +401,7 @@
       : "";
     app.innerHTML = "<h1>Тренировки</h1>" + planLink + trainerCards +
       linkRow("#/library", "dumbbell", "Каталог упражнений", "По мышцам, оборудованию и уровню, с моделью тела", String(window.Catalog.EXERCISES.length)) +
+      linkRow("#/machines", "book", "Справочник тренажёров", "Для чего тренажёр, мышцы, настройка, техника и безопасность", String(window.Machines.MACHINES.length)) +
       "<h2>Готовые программы</h2>" + PROGRAMS.map(p =>
       `<a class="card" href="#/p/${p.id}"><div class="row"><div><b><span class="ti">${ic(p.icon || "dumbbell", 18)}</span>${esc(p.title)}</b><div class="muted">${esc(p.description)}</div></div>
         <span class="pill ${doneDays(p) === p.days.length ? "done" : ""}">${doneDays(p)}/${p.days.length} дн.</span></div></a>`).join("") + (Gd.isPro() ? "" : PAGES.proTeaser());
@@ -451,7 +457,7 @@
     const exs = p.exercises.map(e => {
       const done = state.done[k(p.id, e.id)];
       return `<a class="card" href="#/e/${p.id}/${e.id}"><div class="row"><div><b>${esc(e.title)}</b><div class="muted">${esc(e.summary)}</div></div>
-        <span class="pill ${done ? "done" : ""}">${done ? ic("check", 14) + " просмотрено" : "видео +" + e.points}</span></div></a>`;
+        <span class="pill ${done ? "done" : ""}">${done ? ic("check", 14) + " просмотрено" : e.video ? "видео +" + e.points : "техника"}</span></div></a>`;
     }).join("");
     app.innerHTML = `<a class="back" href="#/programs">← Все программы</a><h1>${esc(p.title)}</h1><p class="muted">${esc(p.description)}</p>
       <h2>План</h2>${days}<h2>Видео и разбор техники</h2>${exs}`;
@@ -672,6 +678,7 @@
     else if (a === "plan") PAGES.plan(FW);
     else if (a === "pd") PAGES.planDay(FW, b);
     else if (a === "library") PAGES.library(FW, b);
+    else if (a === "machines") PAGES.machines(FW, b);
     else if (a === "x") PAGES.exercise(FW, b);
     else if (a === "ideas") PAGES.ideas(FW, b);
     else if (a === "sleep") PAGES.sleep(FW);
@@ -694,7 +701,7 @@
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     if (keepScroll !== true) window.scrollTo(0, 0);
   }

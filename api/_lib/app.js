@@ -13,7 +13,9 @@ const LIMITS = ["knees", "back", "shoulders", "wrists", "heart"];
 const STREAK_GAP = 2;
 
 // ---- очки и бонусы ----
-const basePoints = program => (program === "stretch" ? 10 : 20);
+// Растяжка и йога (лёгкие дни) — 10 баллов, остальные тренировки — 20.
+const LIGHT_PROGRAMS = ["stretch", "runyoga"];
+const basePoints = program => (LIGHT_PROGRAMS.includes(program) ? 10 : 20);
 const bonusFor = streak => (streak >= 7 ? 10 : streak >= 3 ? 5 : 0);
 
 // prevDesc — номера дней прошлых тренировок по убыванию (раньше day); считаем серию вместе с днём day.

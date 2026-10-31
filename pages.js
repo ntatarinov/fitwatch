@@ -354,6 +354,34 @@
     FW.app.querySelectorAll("#ideafilters [data-st]").forEach(b => b.onclick = () => { ideasUi.status = b.dataset.st; draw(); });
     if (focus) { const el = document.getElementById("idea-" + focus); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" }); }
   };
+  // ---------- справочник тренажёров ----------
+  P.machines = function (FW, id) {
+    const { app, esc } = FW, M = window.Machines, C = window.Catalog, ic = (n, s) => window.Icons.svg(n, s);
+    const mus = list => list.map(x => C.labelOf(C.MUSCLES, x)).join(", ");
+    if (id) {
+      const t = M.byId(id);
+      if (!t) return FW.notFound();
+      const ex = t.exercise && C.byId(t.exercise);
+      app.innerHTML = `<a class="back" href="#/machines">← Тренажёры</a><h1>${esc(t.title)}</h1>
+        <div class="tags">${t.muscles.map(x => `<span class="tag">${esc(C.labelOf(C.MUSCLES, x))}</span>`).join("")}</div>
+        <p>${esc(t.purpose)}</p>
+        <div class="card"><b>Как настроить</b><ol>${t.setup.map(s => `<li>${esc(s)}</li>`).join("")}</ol></div>
+        <div class="card"><b>Техника по шагам</b><ol>${t.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol></div>
+        <div class="card warn"><b>Безопасность</b><ul>${t.safety.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
+        <div class="card"><b>Частые ошибки</b><p class="muted" style="margin:6px 0 0">${esc(t.mistakes)}</p></div>
+        ${ex ? `<a class="card row-link" href="#/x/${esc(ex.id)}"><span class="oi">${ic(ex.video ? "play" : "book", 22)}</span><div class="rl-tx"><b>Похожее упражнение: ${esc(ex.title)}</b><div class="muted">${ex.video ? "Видео и разбор техники" : "Разбор техники"}</div></div><span class="chev" aria-hidden="true">›</span></a>` : ""}
+        <p class="muted tiny">Общие сведения для новичка. Настройку и технику на конкретном тренажёре проверь у тренера зала.</p>`;
+      return;
+    }
+    const row = t => `<a class="card row-link" href="#/machines/${esc(t.id)}"><span class="oi">${ic(t.kind === "cardio" ? "activity" : "dumbbell", 22)}</span><div class="rl-tx"><b>${esc(t.title)}</b><div class="muted">${esc(mus(t.muscles))}</div></div><span class="chev" aria-hidden="true">›</span></a>`;
+    app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Справочник тренажёров</h1>
+      <p class="muted">Для чего тренажёр, какие мышцы работают, как настроить, техника по шагам и правила безопасности.</p>
+      <details class="card faq"><summary>Общие правила в зале</summary><ul>${M.GENERAL.map(s => `<li>${esc(s)}</li>`).join("")}</ul></details>
+      <h2>Силовые</h2>${M.MACHINES.filter(t => t.kind === "strength").map(row).join("")}
+      <h2>Кардио</h2>${M.MACHINES.filter(t => t.kind === "cardio").map(row).join("")}
+      <p class="muted tiny">Общие сведения для новичка. Настройку и технику на конкретном тренажёре проверь у тренера зала.</p>`;
+  };
+
   // ---------- сон ----------
   const sleepAdvice = avg => avg == null ? "" : avg < 6 ? "В среднем меньше 6 часов: восстановление страдает. Сдвинь отбой раньше и в такие дни выбирай лёгкие тренировки."
     : avg < 7 ? "Почти норма. Взрослым обычно нужно 7–9 часов: попробуй ложиться на 30 минут раньше."

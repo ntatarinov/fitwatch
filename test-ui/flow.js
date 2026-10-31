@@ -84,7 +84,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   await go(w, "#/library");
   ok($$(w, ".mz").length >= 25, "модель тела нарисована");
   const total = Number(/из (\d+)/.exec(text(w, "#libcount"))[1]);
-  ok(total === 39, "в каталоге 39 упражнений");
+  ok(total === 43, "в каталоге 43 упражнения");
   const chest = $(w, '.mz[data-m="chest"]');
   click(w, chest);
   ok($$(w, ".mz.on").length === 2 && /Грудь/.test(text(w, "#musclesel")), "выбрана грудь");
@@ -170,15 +170,36 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok($$(w, ".toast").length === 0, "демо-данные не вызывают лавину уведомлений");
   ok(state(w).seen.length >= 3, "после демо достижения отмечены как показанные");
 
+  // 7b2. справочник тренажёров и новые программы
+  await go(w, "#/programs");
+  ok(!!$(w, 'a[href="#/machines"]') && $$(w, 'a[href="#/p/travel"]').length === 1 && $$(w, 'a[href="#/p/runyoga"]').length === 1, "в тренировках есть справочник тренажёров и программы «В поездке» и «Для бегунов»");
+  await go(w, "#/machines");
+  ok(/Справочник тренажёров/.test(text(w, "h1")) && $$(w, 'main a.row-link[href^="#/machines/"]').length >= 12 && /Общие правила/.test(text(w, "main")), "справочник: список тренажёров и общие правила");
+  await go(w, "#/machines/leg_press");
+  ok(/Жим ногами/.test(text(w, "h1")) && /Как настроить/.test(text(w, "main")) && /Техника по шагам/.test(text(w, "main")) && /Безопасность/.test(text(w, "main")), "тренажёр: настройка, техника, безопасность");
+  ok($(w, 'a[href="#/x/leg_press"]') !== null, "из тренажёра можно перейти к упражнению с видео");
+  await go(w, "#/machines/nope");
+  ok(/Не найдено/.test(text(w, "main")), "несуществующий тренажёр: «Не найдено»");
+  await go(w, "#/p/travel");
+  ok(/В поездке/.test(text(w, "h1")) && $$(w, 'main a.card[href^="#/d/travel/"]').length === 3 && $$(w, 'main a.card[href^="#/e/travel/"]').length >= 8, "«В поездке»: 3 дня и разбор упражнений");
+  await go(w, "#/e/travel/incline_pushup");
+  ok(/Отжимания от опоры/.test(text(w, "main")) && !!$(w, ".video"), "упражнение из каталога открывается внутри программы, с видео");
+  await go(w, "#/p/runyoga");
+  ok(/бегунов/.test(text(w, "h1")) && $$(w, 'main a.card[href^="#/d/runyoga/"]').length === 3, "«Йога и растяжка для бегунов»: 3 комплекса");
+  await go(w, "#/e/runyoga/down_dog");
+  ok(/Собака мордой вниз/.test(text(w, "main")) && /Видео для этого упражнения пока нет/.test(text(w, "main")), "упражнение без видео честно об этом говорит, техника описана");
+  await go(w, "#/d/runyoga/d2");
+  ok(/\+10/.test(text(w, "#checkin")) || /уже засчитана/.test(text(w, "#checkin")), "день йоги — лёгкий: 10 баллов");
+
   // 7c. идеи команды
   await go(w, "#/ideas");
   ok(/Идеи команды/.test(text(w, "h1")) && $$(w, ".person").length === 2, "идеи: два участника");
-  ok(/52%/.test(text(w, ".persons")) && /18%/.test(text(w, ".persons")), "идеи: проценты 52% и 18%");
+  ok(/52%/.test(text(w, ".persons")) && /36%/.test(text(w, ".persons")), "идеи: проценты 52% и 36%");
   ok($$(w, "#ideaslist .idea").length === 44 && $$(w, ".idea.st-ready").length >= 9, "идеи: 44 идеи, готовые отмечены");
   click(w, $(w, '[data-st="ready"]'));
-  ok($$(w, "#ideaslist .idea").length === 9 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 9");
+  ok($$(w, "#ideaslist .idea").length === 12 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 12 (9 у Сани и 3 у Айдархана)");
   click(w, $(w, '[data-who="aidarkhan"]'));
-  ok($$(w, "#ideaslist .idea").length === 0, "идеи: у Айдархана готовых нет");
+  ok($$(w, "#ideaslist .idea").length === 3, "идеи: у Айдархана три готовые (тренажёры, поездки, бегуны)");
   click(w, $(w, '[data-st=""]')); click(w, $(w, '[data-who=""]'));
   const links = $$(w, ".idea a.btn").map(a => a.getAttribute("href"));
   ok(links.length >= 12, "идеи: у готовых и частичных есть кнопка «Посмотреть» (" + links.length + ")");
@@ -193,7 +214,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok($$(w, "#ideaslist .idea").length === 44 && $$(w, ".idea").length === 50, "идеи: 44 идеи в списке и 6 пунктов основы отдельно");
   click(w, $(w, '[data-who="aidarkhan"]'));
   ok($$(w, "#ideaslist .idea").length === 11 && $$(w, "#ideaslist .idea .ask").length === 11, "идеи: у всех 11 идей Айдархана показана его формулировка");
-  ok(/Встроенный маркетплейс/.test(text(w, "#idea-B1")) && /жим ногами/.test(text(w, "#idea-B2")), "идеи: тексты идей взяты из его списка");
+  ok(/Встроенный маркетплейс/.test(text(w, "#idea-B1")) && /правила безопасности и пошаговая техника/.test(text(w, "#idea-B2")), "идеи: тексты идей взяты из его списка");
   click(w, $(w, '[data-who=""]'));
   const foundationStatus = $$(w, ".idea").slice(44).map(e => e.querySelector(".st").textContent);
   ok(foundationStatus.join() === "Готово,Частично,Частично,Частично,Готово,Частично", "идеи: статусы основы совпадают с идеями Сани: " + foundationStatus.join());

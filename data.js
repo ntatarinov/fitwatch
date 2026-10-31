@@ -198,6 +198,66 @@ window.PROGRAMS = [
       },
     ],
   },
+  // Программы из упражнений каталога (catalog.js): техника и видео берутся оттуда. optional — не предлагаются как «следующий день».
+  {
+    id: "travel",
+    icon: "bolt",
+    optional: true,
+    title: "В поездке",
+    description: "Без инвентаря и без прыжков: хватит места 2×2 метра в номере отеля, соседи не услышат. 10–20 минут.",
+    catalog: ["squat", "incline_pushup", "glute_bridge", "plank", "dead_bug", "lunge", "calf_raise", "side_plank", "superman", "triceps_dips", "bicycle"],
+    days: [
+      { id: "d1", title: "Номер отеля: всё тело за 15 минут", items: [
+        { ex: "squat", sets: 3, reps: "12–15", rest: 45 },
+        { ex: "incline_pushup", sets: 3, reps: "8–12 (от кровати или стола)", rest: 45 },
+        { ex: "glute_bridge", sets: 3, reps: "15", rest: 30 },
+        { ex: "plank", sets: 3, reps: "30 сек", rest: 30 },
+      ] },
+      { id: "d2", title: "Тихо и без прыжков: ноги и кор", items: [
+        { ex: "lunge", sets: 3, reps: "8–10 на ногу", rest: 45 },
+        { ex: "calf_raise", sets: 3, reps: "15–20", rest: 30 },
+        { ex: "side_plank", sets: 2, reps: "20–30 сек на сторону", rest: 30 },
+        { ex: "dead_bug", sets: 3, reps: "8–10 на сторону", rest: 30 },
+      ] },
+      { id: "d3", title: "10 минут перед выездом", items: [
+        { ex: "squat", sets: 2, reps: "15", rest: 30 },
+        { ex: "triceps_dips", sets: 2, reps: "8–10 (от стула)", rest: 30 },
+        { ex: "superman", sets: 2, reps: "12", rest: 30 },
+        { ex: "bicycle", sets: 2, reps: "20", rest: 30 },
+      ] },
+    ],
+    exercises: [],
+  },
+  {
+    id: "runyoga",
+    icon: "activity",
+    optional: true,
+    title: "Йога и растяжка для бегунов",
+    description: "Разминка перед бегом, растяжка после и йога для мобильности бёдер и спины. Снимает закрепощённость и помогает беречь колени и икры.",
+    catalog: ["leg_swings", "calf_raise", "glute_bridge", "calf_stretch", "hamstring_stretch", "hip_flexor_stretch", "figure_four", "down_dog", "childs_pose", "cat_cow", "supine_twist"],
+    days: [
+      { id: "d1", title: "Перед пробежкой: разминка 8 минут", points: 10, items: [
+        { ex: "leg_swings", sets: 1, reps: "10–15 на каждую ногу и сторону", rest: 0 },
+        { ex: "calf_raise", sets: 2, reps: "15", rest: 20 },
+        { ex: "glute_bridge", sets: 2, reps: "12", rest: 20 },
+      ] },
+      { id: "d2", title: "После пробежки: растяжка 10 минут", points: 10, items: [
+        { ex: "calf_stretch", sets: 2, reps: "30 сек на ногу", rest: 0 },
+        { ex: "hamstring_stretch", sets: 2, reps: "30 сек на ногу", rest: 0 },
+        { ex: "hip_flexor_stretch", sets: 2, reps: "30 сек на ногу", rest: 0 },
+        { ex: "figure_four", sets: 2, reps: "30–45 сек на сторону", rest: 0 },
+      ] },
+      { id: "d3", title: "Йога для бегунов: мобильность 15 минут", points: 10, items: [
+        { ex: "cat_cow", sets: 1, reps: "8–10 циклов", rest: 0 },
+        { ex: "down_dog", sets: 3, reps: "5–8 вдохов", rest: 0 },
+        { ex: "hip_flexor_stretch", sets: 2, reps: "30 сек на ногу", rest: 0 },
+        { ex: "figure_four", sets: 2, reps: "45 сек на сторону", rest: 0 },
+        { ex: "supine_twist", sets: 2, reps: "30–45 сек на сторону", rest: 0 },
+        { ex: "childs_pose", sets: 1, reps: "1–2 мин", rest: 0 },
+      ] },
+    ],
+    exercises: [],
+  },
 ];
 
 // Какую долю ролика нужно реально посмотреть, чтобы получить баллы.
