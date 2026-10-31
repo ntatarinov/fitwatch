@@ -122,18 +122,48 @@
         ${myLimits.length ? `<label class="chk"><input type="checkbox" id="libLimits" ${lib.limits ? "checked" : ""}> Не показывать то, что мне не подходит (${esc(myLimits.map(l => lab(C.LIMITS, l)).join(", "))})</label>` : ""}</div>
       <div id="liblist"></div>`;
 
+    // Фигура: «Спереди», «Сзади» (рисунок с подписями) или «3D» (объёмный манекен, грузится по запросу).
+    let ctl3d = null, shown3d = false;
+    const prevCleanup = P._cleanup;
+    P._cleanup = () => { if (ctl3d) { ctl3d.destroy(); ctl3d = null; } P._cleanup = prevCleanup; if (prevCleanup) prevCleanup(); };
+    const seg = () => `<div class="seg body-seg" role="group" aria-label="Вид фигуры">${[["front", "Спереди"], ["back", "Сзади"], ["3d", "3D"]].map(([v, l]) => `<button type="button" class="seg-b ${lib.view === v ? "on" : ""}" data-view="${v}" aria-pressed="${lib.view === v}"><b>${l}</b></button>`).join("")}</div>`;
+    const list3d = () => `<div class="chips b3d-list" aria-label="Мышцы">${window.Body3D.muscles().map(m => `<button type="button" class="ghost ${lib.muscle === m ? "on" : ""}" data-m="${m}" aria-pressed="${lib.muscle === m}">${esc(labels[m])}</button>`).join("")}</div>`;
+    function drawBody() {
+      const box = document.getElementById("bodywrap");
+      if (lib.view === "3d") {
+        if (shown3d) {
+          if (ctl3d) ctl3d.select(lib.muscle);
+          box.querySelector(".b3d-list").outerHTML = list3d();
+          return;
+        }
+        shown3d = true;
+        box.innerHTML = seg() + `<div class="b3d" id="b3d"><p class="muted b3d-msg">Загружаю 3D-манекен…</p></div>` + list3d();
+        const nav = FW.nav();
+        window.Body3D.mount(document.getElementById("b3d"), { selected: lib.muscle, labels, onPick: m => { lib.muscle = m; draw(); } })
+          .then(c => { if (FW.stale(nav) || lib.view !== "3d") { c.destroy(); return; } ctl3d = c; })
+          .catch(() => {
+            const el = document.getElementById("b3d");
+            if (el) el.innerHTML = `<div class="b3d-fail"><p>3D сейчас недоступно: ${window.Body3D.hasWebGL() ? "не загрузилось (нужен интернет)" : "это устройство не поддерживает объёмную графику"}.</p><button type="button" class="ghost" data-view="front">Показать рисунок</button></div>`;
+          });
+        return;
+      }
+      if (ctl3d) { ctl3d.destroy(); ctl3d = null; }
+      shown3d = false;
+      // Одна крупная фигура; если выбранной мышцы на этой стороне нет, фигура поворачивается сама.
+      if (lib.muscle && !window.Body.musclesIn(lib.view).includes(lib.muscle)) lib.view = lib.view === "front" ? "back" : "front";
+      box.innerHTML = seg() + window.Body.svg(lib.view, lib.muscle, labels);
+    }
     const draw = () => {
       const avoid = lib.limits && myLimits.length ? myLimits : null;
       let list = C.filter(C.EXERCISES, { q: lib.q, muscle: lib.muscle, equipment: lib.equipment, kind: lib.kind, level: lib.level || 0, avoid });
       if (avoid && avoid.includes("heart")) list = list.filter(e => !e.intense);
-      // Одна крупная фигура; если выбранной мышцы на этой стороне нет, фигура поворачивается сама.
-      if (lib.muscle && !window.Body.musclesIn(lib.view).includes(lib.muscle)) lib.view = lib.view === "front" ? "back" : "front";
-      document.getElementById("bodywrap").innerHTML = `<div class="seg body-seg" role="group" aria-label="Сторона тела">${[["front", "Спереди"], ["back", "Сзади"]].map(([v, l]) => `<button type="button" class="seg-b ${lib.view === v ? "on" : ""}" data-view="${v}" aria-pressed="${lib.view === v}"><b>${l}</b></button>`).join("")}</div>` + window.Body.svg(lib.view, lib.muscle, labels);
+      drawBody();
       document.getElementById("musclesel").textContent = lib.muscle ? "Выбрано: " + labels[lib.muscle] : "Мышца не выбрана";
       document.getElementById("libmuscle").value = lib.muscle;
       document.getElementById("libcount").textContent = "Найдено упражнений: " + list.length + " из " + C.EXERCISES.length + ". Видео есть у " + C.EXERCISES.filter(e => e.video).length + ".";
-      document.getElementById("liblist").innerHTML = list.length ? list.map(e => `<a class="card" href="#/x/${e.id}"><div class="row"><div><b>${esc(e.title)}</b>
-        <div class="muted">${esc(e.muscles.map(m => labels[m]).join(", "))} · ${esc(lab(C.EQUIPMENT, e.equipment))} · ${esc(lab(C.LEVELS, e.level))}</div></div>
+      // Карточка упражнения: превью из видео (картинка), название, мышцы, оборудование, уровень.
+      document.getElementById("liblist").innerHTML = list.length ? list.map(e => `<a class="card lib-row" href="#/x/${e.id}">${e.video ? `<img class="thumb" src="https://i.ytimg.com/vi/${encodeURIComponent(e.video)}/mqdefault.jpg" alt="" loading="lazy" onerror="this.remove()">` : `<span class="thumb thumb-none">${window.Icons.svg("book", 22)}</span>`}
+        <div class="rl-tx"><b>${esc(e.title)}</b><div class="muted">${esc(e.muscles.map(m => labels[m]).join(", "))} · ${esc(lab(C.EQUIPMENT, e.equipment))} · ${esc(lab(C.LEVELS, e.level))}</div>
         <span class="pill">${e.video ? window.Icons.svg("play", 14) + " видео" : "без видео"}</span></div></a>`).join("")
         : "<div class='card'><p class='muted'>Ничего не найдено. Сбросьте фильтры или выберите другую мышцу.</p></div>";
     };
@@ -143,7 +173,7 @@
     const wrap = document.getElementById("bodywrap");
     wrap.onclick = ev => {
       const v = ev.target.closest("[data-view]");
-      if (v) { lib.view = v.dataset.view; if (lib.muscle && !window.Body.musclesIn(lib.view).includes(lib.muscle)) lib.muscle = ""; draw(); return; }
+      if (v) { lib.view = v.dataset.view; if (lib.view !== "3d" && lib.muscle && !window.Body.musclesIn(lib.view).includes(lib.muscle)) lib.muscle = ""; draw(); return; }
       const z = ev.target.closest("[data-m]"); if (z) pick(z.dataset.m);
     };
     wrap.onkeydown = ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.m) { ev.preventDefault(); pick(ev.target.dataset.m); } };

@@ -435,3 +435,19 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .ml.on text { fill:var(--accent-text); font-weight:800; }
 .ml-line { stroke:var(--line); stroke-width:1; fill:none; } .ml-dot { fill:var(--muted); }
 .ml.on .ml-line { stroke:var(--accent-2); } .ml.on .ml-dot { fill:var(--accent-2); }
+
+/* ================= 3D-манекен и превью упражнений ================= */
+:root { --bs3d:#ECE6DC; --mz3d:#C48A7B; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bs3d:#6A6A76; --mz3d:#B67A6B; } }
+:root[data-theme="dark"] { --bs3d:#6A6A76; --mz3d:#B67A6B; }
+.b3d { position:relative; min-height:300px; border-radius:var(--radius-sm); background:var(--surface-2); overflow:hidden; margin-top:4px; }
+.b3d-canvas { display:block; width:100%; height:auto; touch-action:pan-y; cursor:grab; }
+.b3d-msg { padding:40px 16px; text-align:center; }
+.b3d-tag { position:absolute; transform:translate(-50%, -150%); background:var(--text); color:var(--bg); font-weight:700; font-size:12px; padding:3px 10px; border-radius:999px; white-space:nowrap; pointer-events:none; }
+.b3d-hint { position:absolute; left:0; right:0; bottom:8px; text-align:center; font-size:12px; color:var(--muted); pointer-events:none; }
+.b3d-fail { padding:28px 16px; text-align:center; } .b3d-fail p { margin:0 0 12px; color:var(--muted); }
+.b3d-list { margin-top:10px; }
+.lib-row { display:flex; gap:12px; align-items:center; }
+.lib-row .rl-tx { flex:1; min-width:0; } .lib-row .pill { margin-top:6px; }
+.thumb { width:104px; height:58px; object-fit:cover; border-radius:10px; flex:none; background:var(--surface-2); }
+.thumb-none { display:flex; align-items:center; justify-content:center; color:var(--muted); }

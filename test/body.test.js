@@ -42,3 +42,14 @@ test("подписи экранируются", () => {
   const s = Body.svg("front", null, { chest: '<b>"x"</b>' });
   assert.ok(!s.includes("<b>"));
 });
+
+test("3D-манекен: все мышцы каталога есть, детали заданы числами, библиотека закреплена по версии", () => {
+  const B3 = require("../body3d.js");
+  const ids = Catalog.MUSCLES.map(m => m.id);
+  assert.deepEqual([...B3.muscles()].sort(), [...ids].sort(), "в 3D те же 14 мышц, что в каталоге");
+  const num = v => Array.isArray(v) && v.every(Number.isFinite);
+  B3.MUSCLES.forEach(mu => mu.parts.forEach(p => assert.ok(num(p.p) && p.p.length === 3 && num(p.s) && p.s.every(x => x > 0) && (!p.r || num(p.r)), mu.m)));
+  B3.PARTS.forEach(p => assert.ok(p.e ? num(p.e.p) && num(p.e.s) : num(p.l.a) && num(p.l.b) && p.l.ra > 0 && p.l.rb > 0));
+  assert.match(B3.SRC, /^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r\d+\/three\.min\.js$/, "точная версия библиотеки с cdnjs");
+  assert.equal(B3.hasWebGL(), false, "без браузера WebGL нет — mount честно откажет");
+});

@@ -92,6 +92,15 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok(/Пресс/.test(text(w, "#musclesel")), "нажатие на подпись тоже выбирает мышцу");
   click(w, $(w, '#bodywrap [data-view="back"]'));
   ok($$(w, "#bodywrap .mz").length === 8 && /Широчайшие/.test(text(w, "#bodywrap")) && !/Пресс/.test(text(w, "#musclesel")), "«Сзади»: 8 мышц спины, выбор пресса снят (его не видно сзади)");
+  click(w, $(w, '#bodywrap [data-view="3d"]'));
+  await tick(w, 40);
+  ok($(w, '#bodywrap [data-view="3d"]').classList.contains("on") && $$(w, "#bodywrap .b3d-list [data-m]").length === 14, "режим 3D: под манекеном список из 14 мышц");
+  ok(/3D сейчас недоступно/.test(text(w, "#b3d")) && !!$(w, '#b3d [data-view="front"]'), "без объёмной графики — честное сообщение и кнопка «Показать рисунок»");
+  click(w, $(w, '#bodywrap .b3d-list [data-m="glutes"]'));
+  ok(/Ягодицы/.test(text(w, "#musclesel")) && $(w, '#bodywrap .b3d-list [data-m="glutes"]').classList.contains("on") && $$(w, "#liblist .lib-row").length >= 2, "в 3D выбор из списка: ягодицы, ниже упражнения для них");
+  ok($$(w, "#liblist img.thumb").length >= 1 && /i\.ytimg\.com\/vi\/[\w-]+\/mqdefault\.jpg/.test($(w, "#liblist img.thumb").getAttribute("src")), "у упражнений с видео есть картинка-превью");
+  click(w, $(w, '#b3d [data-view="front"]'));
+  ok(!$(w, "#b3d") && $$(w, "#bodywrap .mz").length >= 8, "«Показать рисунок» возвращает нарисованный манекен");
   click(w, $(w, '#bodywrap [data-view="front"]'));
   click(w, $(w, '.mz[data-m="chest"]'));
   ok($$(w, "#liblist a.card").length >= 3 && $$(w, "#liblist a.card").every(a => /Грудь/.test(a.textContent)), "в списке только упражнения для груди");
