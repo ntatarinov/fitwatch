@@ -82,12 +82,18 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
 
   // 4. каталог и модель тела
   await go(w, "#/library");
-  ok($$(w, ".mz").length >= 25, "модель тела нарисована");
+  ok($$(w, "#bodywrap .mz").length === 9 && $$(w, "#bodywrap .ml").length === 9 && /Квадрицепс/.test(text(w, "#bodywrap")), "манекен спереди: 9 мышц, у каждой подпись");
   const total = Number(/из (\d+)/.exec(text(w, "#libcount"))[1]);
   ok(total === 43, "в каталоге 43 упражнения");
   const chest = $(w, '.mz[data-m="chest"]');
   click(w, chest);
-  ok($$(w, ".mz.on").length === 2 && /Грудь/.test(text(w, "#musclesel")), "выбрана грудь");
+  ok($$(w, ".mz.on").length === 1 && /Грудь/.test(text(w, ".ml.on")) && /Грудь/.test(text(w, "#musclesel")), "выбрана грудь: подсвечены мышца и подпись");
+  click(w, $(w, '#bodywrap .ml[data-m="abs"]'));
+  ok(/Пресс/.test(text(w, "#musclesel")), "нажатие на подпись тоже выбирает мышцу");
+  click(w, $(w, '#bodywrap [data-view="back"]'));
+  ok($$(w, "#bodywrap .mz").length === 8 && /Широчайшие/.test(text(w, "#bodywrap")) && !/Пресс/.test(text(w, "#musclesel")), "«Сзади»: 8 мышц спины, выбор пресса снят (его не видно сзади)");
+  click(w, $(w, '#bodywrap [data-view="front"]'));
+  click(w, $(w, '.mz[data-m="chest"]'));
   ok($$(w, "#liblist a.card").length >= 3 && $$(w, "#liblist a.card").every(a => /Грудь/.test(a.textContent)), "в списке только упражнения для груди");
   click(w, $(w, "#muscleclear"));
   ok($$(w, ".mz.on").length === 0, "выбор мышцы сброшен");
@@ -102,7 +108,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   ok($$(w, "#liblist a.card").length === 2, "тренажёры: 2 упражнения");
   eq.value = ""; eq.dispatchEvent(new w.Event("change", { bubbles: true }));
   await go(w, "#/library/glutes");
-  ok($$(w, ".mz.on").length === 2 && /Ягодицы/.test(text(w, "#musclesel")), "ссылка с мышцей выбирает её");
+  ok($$(w, ".mz.on").length === 1 && /Ягодицы/.test(text(w, "#musclesel")) && $(w, '#bodywrap [data-view="back"]').classList.contains("on"), "ссылка с мышцей выбирает её и сама поворачивает фигуру спиной");
 
   // 5. страница упражнения
   await go(w, "#/x/lunge");

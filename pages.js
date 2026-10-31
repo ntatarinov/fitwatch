@@ -101,7 +101,7 @@
   };
 
   // ---------- каталог упражнений и модель тела ----------
-  const lib = { q: "", muscle: "", equipment: "", level: 0, kind: "", limits: true };
+  const lib = { q: "", muscle: "", equipment: "", level: 0, kind: "", limits: true, view: "front" };
 
   P.library = function (FW, preset) {
     const { app, esc } = FW, st = FW.state, C = window.Catalog;
@@ -112,7 +112,7 @@
     app.innerHTML = `<a class="back" href="#/programs">← Тренировки</a><h1>Каталог упражнений</h1>${window.Guide.tip("library")}
       ${P.ideaChips(["A1", "A2", "A3"])}
       <p class="muted" id="libcount"></p>
-      <div class="card"><b>Выбери мышцу</b><p class="muted">Нажми на мышцу на схеме, и ниже останутся упражнения для неё. Схема упрощённая.</p>
+      <div class="card"><b>Выбери мышцу</b><p class="muted">Нажми на мышцу или на её название, и ниже останутся упражнения для неё.</p>
         <div class="body-wrap" id="bodywrap"></div>
         <div class="row" style="margin-top:8px"><span id="musclesel" class="muted"></span><button class="ghost" id="muscleclear" type="button">Сбросить</button></div></div>
       <div class="card"><div class="filters">
@@ -126,7 +126,9 @@
       const avoid = lib.limits && myLimits.length ? myLimits : null;
       let list = C.filter(C.EXERCISES, { q: lib.q, muscle: lib.muscle, equipment: lib.equipment, kind: lib.kind, level: lib.level || 0, avoid });
       if (avoid && avoid.includes("heart")) list = list.filter(e => !e.intense);
-      document.getElementById("bodywrap").innerHTML = ["front", "back"].map(v => `<div class="body-col"><div class="muted body-cap">${v === "front" ? "Спереди" : "Сзади"}</div>${window.Body.svg(v, lib.muscle, labels)}</div>`).join("");
+      // Одна крупная фигура; если выбранной мышцы на этой стороне нет, фигура поворачивается сама.
+      if (lib.muscle && !window.Body.musclesIn(lib.view).includes(lib.muscle)) lib.view = lib.view === "front" ? "back" : "front";
+      document.getElementById("bodywrap").innerHTML = `<div class="seg body-seg" role="group" aria-label="Сторона тела">${[["front", "Спереди"], ["back", "Сзади"]].map(([v, l]) => `<button type="button" class="seg-b ${lib.view === v ? "on" : ""}" data-view="${v}" aria-pressed="${lib.view === v}"><b>${l}</b></button>`).join("")}</div>` + window.Body.svg(lib.view, lib.muscle, labels);
       document.getElementById("musclesel").textContent = lib.muscle ? "Выбрано: " + labels[lib.muscle] : "Мышца не выбрана";
       document.getElementById("libmuscle").value = lib.muscle;
       document.getElementById("libcount").textContent = "Найдено упражнений: " + list.length + " из " + C.EXERCISES.length + ". Видео есть у " + C.EXERCISES.filter(e => e.video).length + ".";
@@ -139,7 +141,11 @@
     // После перерисовки схемы фокус возвращается на ту же зону: с клавиатуры можно выбирать мышцы подряд.
     const pick = m => { const kb = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.m; lib.muscle = lib.muscle === m ? "" : m; draw(); if (kb) { const z = document.querySelector('#bodywrap [data-m="' + kb + '"]'); if (z && z.focus) z.focus(); } };
     const wrap = document.getElementById("bodywrap");
-    wrap.onclick = ev => { const z = ev.target.closest("[data-m]"); if (z) pick(z.dataset.m); };
+    wrap.onclick = ev => {
+      const v = ev.target.closest("[data-view]");
+      if (v) { lib.view = v.dataset.view; if (lib.muscle && !window.Body.musclesIn(lib.view).includes(lib.muscle)) lib.muscle = ""; draw(); return; }
+      const z = ev.target.closest("[data-m]"); if (z) pick(z.dataset.m);
+    };
     wrap.onkeydown = ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.m) { ev.preventDefault(); pick(ev.target.dataset.m); } };
     document.getElementById("muscleclear").onclick = () => { lib.muscle = ""; draw(); };
     document.getElementById("libq").oninput = ev => { lib.q = ev.target.value; draw(); };

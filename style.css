@@ -417,3 +417,21 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 .role { font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--surface-2); color:var(--muted); }
 .role.r-admin { background:var(--text); color:var(--bg); } .role.r-trainer { background:var(--info-soft); color:var(--info); } .role.r-vip { background:var(--warn-soft); color:var(--warn); }
 .card.user .cl-act { margin-top:10px; } .vip-row select { flex:1; min-width:0; }
+
+/* ================= Манекен с мышцами (каталог) ================= */
+:root { --bs:#E8E3DA; --mz:#CDBFAD; --mz-hover:#F2B595; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bs:#2A2A33; --mz:#4B4B59; --mz-hover:#7A3F26; } }
+:root[data-theme="dark"] { --bs:#2A2A33; --mz:#4B4B59; --mz-hover:#7A3F26; }
+.body-wrap { display:block; }
+.body-seg { max-width:260px; margin:4px auto 6px; }
+.body-svg { width:100%; max-width:440px; height:auto; display:block; margin:0 auto; max-height:none; }
+.bs-base { fill:var(--bs); stroke:none; }
+.mz { fill:var(--mz); stroke:var(--surface); stroke-width:1.3; cursor:pointer; transition:fill .15s; outline:none; }
+.mz:hover, .mz:focus-visible { fill:var(--mz-hover); }
+.mz:focus-visible path { stroke:var(--accent); stroke-width:2.2; }
+.mz.on { fill:var(--accent-2); }
+.fib { fill:none; stroke:var(--surface); stroke-width:1.1; opacity:.8; pointer-events:none; }
+.ml { cursor:pointer; } .ml text { font-size:13px; font-weight:600; fill:var(--muted); } .ml:hover text { fill:var(--text); }
+.ml.on text { fill:var(--accent-text); font-weight:800; }
+.ml-line { stroke:var(--line); stroke-width:1; fill:none; } .ml-dot { fill:var(--muted); }
+.ml.on .ml-line { stroke:var(--accent-2); } .ml.on .ml-dot { fill:var(--accent-2); }
