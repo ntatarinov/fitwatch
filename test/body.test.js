@@ -78,12 +78,17 @@ test("3D-нажатие: со стороны груди не выбираетс�
 test("3D-нажатие: сжатые в целые числа вершины модели переводятся в дробные (иначе луч читает их как есть и попадает случайно)", () => {
   const B3 = require("../body3d.js");
   class Attr { constructor(a, n) { this.array = a; this.itemSize = n; } }
-  const geom = { attributes: { position: { array: new Int16Array([32767, -32767, 0, -32768, 16384, 8192]), normalized: true } }, setAttribute(k, v) { this.attributes[k] = v; }, computeBoundingSphere() { this.sphere = true; }, computeBoundingBox() { this.box = true; } };
+  const geom = { attributes: { position: { array: new Int16Array([32767, -32767, 0, -32768, 16384, 8192]), normalized: true, itemSize: 3, count: 2 } }, setAttribute(k, v) { this.attributes[k] = v; }, computeBoundingSphere() { this.sphere = true; }, computeBoundingBox() { this.box = true; } };
   B3.dequantize({ BufferAttribute: Attr }, geom);
   const p = geom.attributes.position.array;
   assert.ok(p instanceof Float32Array);
   assert.deepEqual([...p].map(v => Math.round(v * 1000) / 1000), [1, -1, 0, -1, 0.5, 0.25]);
   assert.ok(geom.sphere && geom.box);
+  // как в настоящей модели: вершины с отступом (по 4 числа на вершину, четвёртое пустое), атрибут «чередующийся»
+  const il = { attributes: { position: { isInterleavedBufferAttribute: true, data: { stride: 4 }, offset: 0, array: new Int16Array([32767, -32767, 0, 555, -32768, 16384, 8192, 777]), normalized: true, itemSize: 3, count: 2 } }, setAttribute(k, v) { this.attributes[k] = v; }, computeBoundingSphere() {}, computeBoundingBox() {} };
+  B3.dequantize({ BufferAttribute: Attr }, il);
+  assert.equal(il.attributes.position.array.length, 6, "пустые числа отступа не попадают в вершины");
+  assert.deepEqual([...il.attributes.position.array].map(v => Math.round(v * 1000) / 1000), [1, -1, 0, -1, 0.5, 0.25]);
   const f = { attributes: { position: { array: new Float32Array([1, 2, 3]) } }, setAttribute() { throw new Error("не трогать"); } };
   B3.dequantize({}, f);
 });
@@ -96,4 +101,35 @@ test("у каждой из 14 мышц есть подсказка новичк�
     assert.ok(!/[\u{1F300}-\u{1FAFF}]/u.test(f.find + f.feel), m.id + ": без эмодзи");
   });
   assert.deepEqual(Object.keys(C.FEEL).sort(), C.MUSCLES.map(m => m.id).sort());
+});
+
+test("3D: на настоящей модели вершины после перевода совпадают с оригиналом (иначе на экране каша)", () => {
+  const fs = require("fs"), path = require("path"), vm = require("vm"), B3 = require("../body3d.js");
+  const root = path.join(__dirname, "..");
+  const ctx = { console: { log() {}, warn() {} }, TextDecoder, TextEncoder, URL, Blob, setTimeout, Uint8Array, ArrayBuffer, WebAssembly, Promise, Math, Float32Array, Int16Array, Object };
+  ctx.self = ctx; ctx.window = ctx; ctx.document = { createElementNS: () => ({}), createElement: () => ({}) }; ctx.navigator = { userAgent: "node" };
+  vm.createContext(ctx);
+  B3.LIBS.forEach(u => vm.runInContext(fs.readFileSync(path.join(root, u.replace(/^\//, "")), "utf8"), ctx, { filename: u }));
+  const THREE = ctx.THREE, buf = fs.readFileSync(path.join(root, B3.MODEL.replace(/^\//, "")));
+  const loader = new THREE.GLTFLoader(); loader.setMeshoptDecoder(ctx.MeshoptDecoder);
+  return new Promise((ok, fail) => loader.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), "", g => {
+    try {
+      let meshes = 0;
+      g.scene.traverse(n => {
+        if (!n.isMesh) return;
+        const p = n.geometry.attributes.position, raw = [];
+        const sample = [0, 1, 7, Math.floor(p.count / 2), p.count - 1];
+        sample.forEach(i => raw.push([p.getX(i), p.getY(i), p.getZ(i)]));   // как лежит в модели (целые числа)
+        const k = p.normalized ? 32767 : 1;
+        B3.dequantize(THREE, n.geometry);
+        const q = n.geometry.attributes.position;
+        assert.equal(q.array.length, q.count * 3, n.name + ": нет отступов");
+        sample.forEach((i, j) => raw[j].forEach((v, c) => assert.ok(Math.abs(q.array[i * 3 + c] - Math.max(-1, v / k)) < 1e-6, n.name + ": вершина " + i + " совпадает")));
+        const b = n.geometry.boundingBox; assert.ok(b && b.max.x <= 1.0001 && b.min.x >= -1.0001, n.name + ": границы в пределах -1..1");
+        meshes++;
+      });
+      assert.ok(meshes >= 14, "найдены все части модели: " + meshes);
+      ok();
+    } catch (e) { fail(e); }
+  }, fail));
 });

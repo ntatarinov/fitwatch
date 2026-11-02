@@ -37,8 +37,10 @@
     const pos = geometry.attributes.position;
     if (!pos || pos.array instanceof Float32Array) return;
     const k = pos.normalized ? (pos.array instanceof Int16Array ? 32767 : pos.array instanceof Int8Array ? 127 : pos.array instanceof Uint16Array ? 65535 : 255) : 1;
-    const f = new Float32Array(pos.array.length);
-    for (let i = 0; i < f.length; i++) f[i] = Math.max(-1, pos.array[i] / k);
+    // Вершины в модели лежат «с отступом» (meshopt требует кратности 4 байтам: 3 числа Int16 + пустое), поэтому читаем по шагу, а не подряд.
+    const stride = pos.isInterleavedBufferAttribute ? pos.data.stride : pos.itemSize, off = pos.isInterleavedBufferAttribute ? pos.offset : 0;
+    const f = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) for (let c = 0; c < 3; c++) f[i * 3 + c] = Math.max(-1, pos.array[i * stride + off + c] / k);
     geometry.setAttribute("position", new THREE.BufferAttribute(f, 3));
     geometry.computeBoundingSphere(); geometry.computeBoundingBox();
   }
@@ -203,16 +205,30 @@
     const centers = {};
     meshes.forEach(m => { centers[m.userData.m] = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()); });
     const point = new THREE.Vector3(), depth = size.y * 0.035;
-    const hit = ev => {
+    const pick = (x, y) => {
       const r = canvas.getBoundingClientRect();
-      ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
-      camera.updateMatrixWorld(true); figure.updateMatrixWorld(true);
+      ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
       const side = Math.cos(yaw) > 0.35 ? 1 : Math.cos(yaw) < -0.35 ? -1 : 0;
       const hs = ray.intersectObjects(meshes, false).map(h => ({ m: h.object.userData.m, distance: h.distance, point: h.point }));
       return choose(hs, side, depth, h => figure.worldToLocal(point.copy(h.point)).distanceTo(centers[h.m]));
     };
-
+    // loose — для нажатия пальцем: между мышцами в настоящей анатомической модели есть щели (кости, сухожилия), палец в них попадает часто.
+    // Если ровно под пальцем ничего нет, смотрим кольца вокруг (10, 22, 36 px) и берём мышцу, которая встретилась чаще всего.
+    const hit = (ev, loose) => {
+      camera.updateMatrixWorld(true); figure.updateMatrixWorld(true);
+      const m = pick(ev.clientX, ev.clientY);
+      if (m || !loose) return m;
+      for (const rad of [10, 22, 36]) {
+        const votes = {}; let best = "", top = 0;
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2, v = pick(ev.clientX + rad * Math.cos(a), ev.clientY + rad * Math.sin(a));
+          if (v) { votes[v] = (votes[v] || 0) + 1; if (votes[v] > top) { top = votes[v]; best = v; } }
+        }
+        if (best) return best;
+      }
+      return "";
+    };
     const pts = new Map();
     let down = null, pinch = null;
     const zoom = f => { view.dist = Math.max(0.45, Math.min(home.dist * 1.2, view.dist * f)); anim = null; all.hidden = view.dist > home.dist * 0.95; ask(); };
@@ -238,7 +254,7 @@
       const was = pts.has(ev.pointerId); pts.delete(ev.pointerId);
       if (pts.size < 2) pinch = null;
       if (ev.type === "pointerup" && was && down && !down.moved) {
-        const m = hit(ev);
+        const m = hit(ev, true);
         if (m) { selected = selected === m ? "" : m; focus(selected); ask(); if (o.onPick) o.onPick(selected); }
       }
       down = null;
@@ -256,7 +272,7 @@
       select(m) { if ((m || "") === selected) return; selected = m || ""; focus(selected, true); ask(); },
       reset() { focus(""); },
       get selected() { return selected; },
-      pickAt: (x, y) => hit({ clientX: x, clientY: y }),
+      pickAt: (x, y, loose) => hit({ clientX: x, clientY: y }, !!loose),
       destroy() {
         alive = false;
         if (raf) root.cancelAnimationFrame(raf);
