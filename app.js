@@ -47,15 +47,17 @@
     })).filter(it => it.ex && it.name && it.sets.length).slice(0, 20);
     if (!items.length) return null;
     return { id: x.id, date: x.date, startedAt: typeof x.startedAt === "string" ? x.startedAt : null, durationSec: Math.max(0, Math.min(86400, Math.round(Number(x.durationSec)) || 0)),
-      title: String(x.title || "Тренировка").slice(0, 80), program: typeof x.program === "string" ? x.program : null, dayId: typeof x.dayId === "string" ? x.dayId : null, items, pending: x.pending === true };
+      title: String(x.title || "Тренировка").slice(0, 80), program: typeof x.program === "string" ? x.program : null, dayId: typeof x.dayId === "string" ? x.dayId : null, items, pending: x.pending === true,
+      rpe: Number.isInteger(x.rpe) && x.rpe >= 1 && x.rpe <= 10 ? x.rpe : null };
   }
   // Начатая, но не завершённая тренировка. Значения полей — строки, как их вводит человек.
   function cleanDraft(x) {
     if (!x || typeof x !== "object" || typeof x.id !== "string" || !Number.isFinite(x.startedAt) || !Array.isArray(x.items)) return null;
     return { id: x.id, startedAt: x.startedAt, title: String(x.title || "Тренировка").slice(0, 80),
       src: x.src && typeof x.src.p === "string" && typeof x.src.d === "string" ? { p: x.src.p.slice(0, 24), d: x.src.d.slice(0, 24) } : null,
+      note: typeof x.note === "string" ? x.note.slice(0, 500) : "", warm: x.warm === true, step: Number.isInteger(x.step) ? Math.max(-1, Math.min(20, x.step)) : null,
       items: x.items.filter(it => it && typeof it === "object" && it.ex && it.name).slice(0, 20).map(it => ({ ex: String(it.ex).slice(0, 24), name: String(it.name).slice(0, 60),
-        sets: (Array.isArray(it.sets) ? it.sets : []).slice(0, 30).map(v => ({ reps: String((v && v.reps) || "").slice(0, 6), kg: String((v && v.kg) || "").slice(0, 7), hint: v && v.hint ? String(v.hint).slice(0, 16) : "" })) })) };
+        sets: (Array.isArray(it.sets) ? it.sets : []).slice(0, 30).map(v => ({ reps: String((v && v.reps) || "").slice(0, 6), kg: String((v && v.kg) || "").slice(0, 7), hint: v && v.hint ? String(v.hint).slice(0, 16) : "", done: !!(v && v.done) })) })) };
   }
   function load() {
     try { return normalize(JSON.parse(localStorage.getItem(KEY))); }
@@ -251,11 +253,11 @@
   const muscleOfEx = id => { const e = window.Catalog.byId(id); return e ? e.muscles : []; };
   const num = v => Number(String(v).replace(",", "."));
   // Завершение: черновик → тренировка. Отметка готовой программы за сегодня привязывается к ней (sid), чтобы тренировка не считалась дважды.
-  function finishSession(draft, minutes) {
+  function finishSession(draft, minutes, rpe) {
     const items = draft.items.map(it => ({ ex: it.ex, name: it.name, sets: it.sets.map(s => ({ reps: Math.min(1000, Math.round(num(s.reps)) || 0), kg: Math.min(1000, Math.max(0, Math.round((num(s.kg) || 0) * 10) / 10)) })).filter(s => s.reps > 0) })).filter(it => it.sets.length);
     if (!items.length) return null;
     const src = draft.src, sess = { id: draft.id, date: today(), startedAt: new Date(draft.startedAt).toISOString(), durationSec: Math.max(60, Math.min(86400, Math.round(minutes * 60))),
-      title: (draft.title || "Тренировка").trim().slice(0, 80) || "Тренировка", program: src ? src.p : null, dayId: src ? src.d : null, items, pending: false };
+      title: (draft.title || "Тренировка").trim().slice(0, 80) || "Тренировка", program: src ? src.p : null, dayId: src ? src.d : null, items, pending: false, rpe: Number.isInteger(rpe) && rpe >= 1 && rpe <= 10 ? rpe : null };
     state.sessions.push(sess);
     state.draft = null;
     const mark = src && state.log.find(l => l.date === sess.date && l.p === src.p && l.d === src.d && !l.sid);
@@ -271,7 +273,7 @@
     return sess;
   }
   async function sendSession(sess) {
-    const r = await window.Account.postSession({ id: sess.id, day: sess.date, startedAt: sess.startedAt, durationSec: sess.durationSec, title: sess.title, program: sess.program, dayId: sess.dayId,
+    const r = await window.Account.postSession({ id: sess.id, day: sess.date, startedAt: sess.startedAt, durationSec: sess.durationSec, title: sess.title, program: sess.program, dayId: sess.dayId, rpe: sess.rpe,
       items: sess.items.map(it => ({ ex: it.ex, name: it.name, sets: it.sets })) });
     if (r.ok || [400, 409, 429].includes(r.status)) delete sess.pending; // записана или повтор ничего не изменит
     save();
@@ -484,14 +486,14 @@
     const secs = day.items.reduce((a, it) => a + (Number(it.sets) || 3) * (45 + (Number(it.rest) || 0)), 0);
     const ms = []; day.items.forEach(it => ((window.Catalog.byId(it.ex) || {}).muscles || []).forEach(x => { if (!ms.includes(x)) ms.push(x); }));
     return { href, title: day.title, count: day.items.length, minutes: Math.max(10, Math.round(secs / 60) + 5), muscles: ms.slice(0, 4).map(x => window.Catalog.labelOf(window.Catalog.MUSCLES, x).toLowerCase()),
-      log: plan ? "#/log/plan/" + m[2] : "#/log/" + m[2] + "/" + m[3] };
+      log: plan ? "#/log/plan/" + m[2] : "#/log/" + m[2] + "/" + m[3], go: plan ? "#/go/plan/" + m[2] : "#/go/" + m[2] + "/" + m[3] };
   }
   function todayCardHtml() {
     if (trainedToday()) return "";
     const t = todayWork(); if (!t) return "";
     const w = n => n + (n % 10 === 1 && n % 100 !== 11 ? " упражнение" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? " упражнения" : " упражнений");
     return `<div class="card today"><span class="muted tiny">Сегодня по плану</span><b>${esc(t.title)}</b><div class="muted">${w(t.count)} · около ${t.minutes} мин${t.muscles.length ? " · " + esc(t.muscles.join(", ")) : ""}</div>
-      <div class="cl-act wrap"><a class="btn" href="${t.href}">Открыть день</a><a class="btn ghost-btn" href="${t.log}">Записать подходы и веса</a></div></div>`;
+      <div class="cl-act wrap"><a class="btn" href="${t.go}">Начать по шагам</a><a class="btn ghost-btn" href="${t.href}">Открыть день</a><a class="btn ghost-btn" href="${t.log}">Записать подходы</a></div></div>`;
   }
   // ---------- ступень пути ----------
   // Ступень растёт от тренировок: 3+ тренировок или запись подходов — «Тренируюсь», 12+ тренировок и 4 записи — «Расту».
@@ -526,6 +528,29 @@
       <p class="muted tiny">Ступень растёт сама от тренировок. Выбранная тобой — минимум: если опытен, начни выше. Сейчас выбрано: ${chosen}.</p>
       <div class="cl-act wrap">${[1, 2, 3].map(n => `<button type="button" class="${n === chosen ? "" : "ghost"}" data-stage="${n}" aria-pressed="${n === chosen}">${n}. ${STAGES[n].name}</button>`).join("")}</div></div>`;
   }
+  // Задания тренера на главной: карточка подгружается с сервера после показа страницы и только у вошедшего.
+  async function fillAssignedSlot() {
+    const slot = document.getElementById("asgslot"), id = navId;
+    if (!slot || window.Account.state.status !== "user") return;
+    const r = await window.Account.assignments();
+    if (id !== navId || !slot.isConnected || !r.ok) return;
+    const fresh = r.data.items.filter(x => x.status === "new");
+    if (!fresh.length) return;
+    const t = fresh[0];
+    slot.innerHTML = `<div class="card today asg"><span class="muted tiny">Тренер ${esc(t.trainer || "")} назначил</span><b>${esc(t.title)}</b><div class="muted">${t.items.length} упражн.${fresh.length > 1 ? " · ещё заданий: " + (fresh.length - 1) : ""}</div>
+      <div class="cl-act wrap"><a class="btn" href="#/go/assigned/${t.id}">Начать по шагам</a><a class="btn ghost-btn" href="#/assigned">Все задания</a></div></div>`;
+  }
+  // Тело за неделю на главной: окраска по нагрузке и одна подсказка, что подтянуть. С ступени 2, когда уже есть что показывать.
+  function bodyCardHtml() {
+    const sum = window.Stats.summarize(state.sessions, state.log, "week", dayNum(today()), muscleOfEx, markSets);
+    if (!Object.keys(sum.byMuscle).length) return "";
+    const labels = Object.fromEntries(window.Catalog.MUSCLES.map(m => [m.id, m.label])), names = Object.fromEntries(window.Stats.LEVELS.map(l => [l.id, l.label]));
+    const levels = {}; Object.keys(sum.byMuscle).forEach(m => { levels[m] = sum.byMuscle[m].level; });
+    const adv = window.Stats.coachAdvice(sum.byMuscle, id => labels[id])[0];
+    return `<a class="card body-card" href="#/stats/week"><div class="row"><b>Твоё тело за неделю</b><span class="muted tiny">Подробнее</span></div>
+      <div class="stat-figs">${["front", "back"].map(v => window.Body.svg(v, null, labels, { levels, compact: true, levelNames: names })).join("")}</div>
+      ${adv ? `<p class="muted" style="margin:6px 0 0">${esc(adv.text)}</p>` : `<p class="muted" style="margin:6px 0 0">Нагрузка сбалансирована.</p>`}</a>`;
+  }
   function home() {
     const L0 = window.Achievements.levelOf(totalPoints());
     const head = `<div class="greet"><h1>Привет, ${esc(displayName())}</h1><div class="lvl"><b>${esc(L0.title)}</b><small>уровень ${L0.index}</small></div></div>`;
@@ -550,7 +575,9 @@
     const flow = (hasToday && adviceNow().kind === "checkin" ? todayCardHtml() + advHero : advHero + todayCardHtml()) + trainingRowsHtml() + weekCardHtml();
     const more = html => (!pro && html.trim() ? `<details class="more"><summary>Ещё разделы</summary>${html}</details>` : html);
     const rest = s === 1 ? more(food + sleep + body + levelCardHtml() + planCardHtml() + proBlock) : s === 2 ? food + more(sleep + body + levelCardHtml() + proBlock) + planCardHtml() : food + sleep + body + levelCardHtml() + planCardHtml() + proBlock;
-    app.innerHTML = head + loginRow + install + pathCardHtml() + steps + flow + rest;
+    const bodyCard = s >= 2 ? bodyCardHtml() : "";
+    app.innerHTML = head + loginRow + install + pathCardHtml() + '<div id="asgslot"></div>' + steps + flow + bodyCard + rest;
+    fillAssignedSlot();
     animateBars();
   }
 
@@ -560,7 +587,7 @@
       ? linkRow("#/plan", "calendar", "Мой план", esc(labelOf(window.Planner.GOALS, state.me.goal)) + " · " + state.plan.days.length + " дн. в неделю", "Открыть")
       : linkRow("#/me", "target", "Мой план", "Подберём тренировки под твою цель", "Подобрать");
     const trainerCards = tr
-      ? linkRow("#/trainers", "chat", "Тренеры и чат", "Персональный тренер, переписка, согласие на доступ к данным", "Открыть") +
+      ? (window.Account.state.status === "user" ? linkRow("#/assigned", "dumbbell", "Задания от тренера", "Тренировки, которые назначил твой тренер", "Открыть") : "") + linkRow("#/trainers", "chat", "Тренеры и чат", "Персональный тренер, переписка, согласие на доступ к данным", "Открыть") +
         linkRow("#/premium", "diamond", "Расширенные программы", "Программы на 4–8 недель по подписке", "Открыть") +
         linkRow("#/trainer", "help", "Тренер по правилам", "Диалог: цель, питание, самочувствие", "Открыть")
       : "";
@@ -852,6 +879,8 @@
     else if (a === "session") PAGES.session(FW, b, c);
     else if (a === "stats") PAGES.stats(FW, b);
     else if (a === "quick") PAGES.quick(FW);
+    else if (a === "go") PAGES.go(FW, b, c);
+    else if (a === "assigned") PAGES.assigned(FW);
     else if (a === "x") PAGES.exercise(FW, b);
     else if (a === "ideas") PAGES.ideas(FW, b);
     else if (a === "sleep") PAGES.sleep(FW);
@@ -874,7 +903,7 @@
     else if (a === "programs") programs();
     else if (a === "trainer") trainer();
     else home();
-    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", log: "programs", quick: "programs", session: "programs", stats: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
+    const tab = { p: "programs", d: "programs", e: "programs", programs: "programs", me: "programs", plan: "programs", pd: "programs", library: "programs", machines: "programs", log: "programs", go: "programs", assigned: "programs", quick: "programs", session: "programs", stats: "programs", x: "programs", food: "food", trainer: "programs", checkin: "home", sleep: "home", tariffs: "programs", premium: "programs", pp: "programs", ppd: "programs", trainers: "programs", coach: "coach", client: "coach", chat: "programs", admin: "profile", ideas: "profile", rating: "rating", account: "profile", body: "profile", profile: "profile", guide: "profile" }[a] || "home";
     document.querySelectorAll("#tabbar a").forEach(t => t.classList.toggle("on", t.dataset.t === tab));
     if (keepScroll !== true) window.scrollTo(0, 0);
   }

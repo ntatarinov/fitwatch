@@ -35,11 +35,13 @@ function install(k) {
       return { ex, name, sets: clean };
     });
     if (total > MAX_SETS) throw bad("Подходов в тренировке не больше " + MAX_SETS);
-    return { id, title, durationSec: dur, program, dayId, items, sets, tonnage: Math.round(kg * 10) / 10 };
+    const rpe = b.rpe === undefined || b.rpe === null ? null : V.int(b.rpe, 1, 10);
+    if (rpe === undefined || (b.rpe != null && rpe === null)) throw bad("Тяжесть тренировки: число от 1 до 10");
+    return { id, title, durationSec: dur, program, dayId, items, sets, tonnage: Math.round(kg * 10) / 10, rpe };
   }
   const out = r => ({ id: r.id, date: r.day, startedAt: r.started_at || null, durationSec: r.duration_sec, title: r.title, program: r.program, dayId: r.day_id,
-    items: r.items, sets: r.sets, tonnage: Number(r.tonnage_kg) });
-  const COLS = "id, day::text AS day, started_at::text AS started_at, duration_sec, title, program, day_id, items, tonnage_kg, sets";
+    items: r.items, sets: r.sets, tonnage: Number(r.tonnage_kg), rpe: r.rpe === null || r.rpe === undefined ? null : Number(r.rpe) });
+  const COLS = "id, day::text AS day, started_at::text AS started_at, duration_sec, title, program, day_id, items, tonnage_kg, sets, rpe";
 
   route("POST", "/api/sessions", async ctx => {
     const u = needUser(ctx), { db } = ctx, s = parse(ctx.body);
@@ -55,9 +57,9 @@ function install(k) {
     if (Number(n[0].n) >= PER_DAY) throw new HttpError(429, "Не больше " + PER_DAY + " тренировок в день");
     try {
       await db.query(
-        `INSERT INTO workout_sessions(id, user_id, day, started_at, duration_sec, title, program, day_id, items, tonnage_kg, sets)
-         VALUES ($1, $2, $3::date, $4::timestamptz, $5, $6, $7, $8, $9::jsonb, $10, $11)`,
-        [s.id, u.id, day, started, s.durationSec, s.title, s.program, s.dayId, JSON.stringify(s.items), s.tonnage, s.sets]);
+        `INSERT INTO workout_sessions(id, user_id, day, started_at, duration_sec, title, program, day_id, items, tonnage_kg, sets, rpe)
+         VALUES ($1, $2, $3::date, $4::timestamptz, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)`,
+        [s.id, u.id, day, started, s.durationSec, s.title, s.program, s.dayId, JSON.stringify(s.items), s.tonnage, s.sets, s.rpe]);
     } catch (e) {
       if (e && (e.code === "23505" || /duplicate key|unique/i.test(String(e.message)))) return { status: 200, body: { id: s.id, already: true, sets: s.sets, tonnage: s.tonnage } };
       throw e;

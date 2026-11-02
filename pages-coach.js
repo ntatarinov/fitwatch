@@ -183,12 +183,20 @@
         <p class="muted" style="margin:6px 0 0">${g.limits && g.limits.length ? "Ограничения: " + esc(g.limits.map(l => C.labelOf(C.LIMITS, l)).join(", ")) : "Ограничений не указано"}</p></div>` : lock("цели и ограничения")}` : ""}
       ${active && s && ser.sessions && ser.sessions.length ? sessionsHtml(ser.sessions, s.sessions28, esc) : ""}
       ${active && s ? `<h2>Последние тренировки</h2><div class="card">${ser.recent.length ? ser.recent.map(w => `<div class="row wl"><span>${esc(ddmm(w.day))} · ${esc(w.title || w.program)}</span><span class="pill">+${w.points}</span></div>`).join("") : '<p class="muted">Пока нет.</p>'}</div>` : ""}
+      ${active && !demo ? `<h2>Назначить тренировку</h2><div class="card asg-build" id="asg">
+        <label class="muted tiny" for="atitle">Название</label><input id="atitle" maxlength="80" placeholder="Например: Грудь и трицепс" style="width:100%">
+        <div id="arows"></div>
+        <label class="muted tiny" for="asearch" style="display:block;margin-top:10px">Добавить упражнение из каталога</label><input id="asearch" type="search" autocomplete="off" placeholder="Жим, присед, тяга…" style="width:100%"><div id="ares" class="lg-res"></div>
+        <label class="muted tiny" for="anote" style="display:block;margin-top:10px">Заметка клиенту (необязательно)</label><textarea id="anote" rows="2" maxlength="500" style="width:100%" placeholder="Отдых между подходами, на что обратить внимание"></textarea>
+        <div class="row" style="margin-top:8px"><span class="status" id="astat" role="status"></span><button type="button" id="asend">Отправить клиенту</button></div>
+        <div class="alist" id="alist"></div></div>` : ""}
       <h2>Моя заметка</h2>
       <div class="card"><p class="muted tiny" style="margin-top:0">Видите только вы, клиент заметку не получает.</p>
         <textarea id="tnote" aria-label="Заметка о клиенте" rows="4" maxlength="1000" placeholder="Что важно помнить: ограничения, договорённости, план на ближайшие недели">${esc(b.trainerNote)}</textarea>
         <div class="row"><span class="status" id="nstat" role="status"></span><button type="button" id="nsave">Сохранить</button></div></div>
       <div class="cl-act wrap">${demo ? '<button type="button" disabled>Открыть чат</button>' : `<a class="btn" href="#/chat/${c.linkId}">Открыть чат</a>`}${active ? `<button type="button" class="ghost" id="cend" ${demo ? "disabled" : ""}>Завершить работу с клиентом</button>` : ""}</div>
       <p class="muted tiny">${DISCLAIMER}</p>`;
+    if (active && !demo) bindAssign(FW, acc, c.linkId);
     const save = document.getElementById("nsave");
     save.onclick = async () => {
       const st = document.getElementById("nstat");
@@ -200,4 +208,43 @@
     const end = document.getElementById("cend");
     if (end && !demo) end.onclick = async () => { if (confirm("Завершить работу с этим клиентом? Доступ к его данным закроется.")) { await acc.linkAction(c.linkId, "end"); location.hash = "#/coach"; } };
   };
+  // Конструктор назначения: упражнения из каталога с подходами и повторениями. Клиент получит задание на главной и в «Заданиях от тренера».
+  function bindAssign(FW, acc, linkId) {
+    const esc = FW.esc, C = window.Catalog, rows = [];
+    const rowsEl = document.getElementById("arows"), res = document.getElementById("ares"), search = document.getElementById("asearch"), stat = document.getElementById("astat");
+    const drawRows = () => {
+      rowsEl.innerHTML = rows.length ? `<div class="lg-head" style="grid-template-columns:1fr 60px 84px 40px;display:grid;gap:6px"><span>Упражнение</span><span>Подходы</span><span>Повторы</span><span></span></div>` + rows.map((r, i) => `<div class="arow"><span>${esc(r.name)}</span>
+        <input inputmode="numeric" maxlength="2" data-i="${i}" data-f="sets" value="${esc(r.sets)}" aria-label="Подходы: ${esc(r.name)}"><input maxlength="12" data-i="${i}" data-f="reps" value="${esc(r.reps)}" aria-label="Повторения: ${esc(r.name)}">
+        <button type="button" class="ghost icon-only" data-rm="${i}" aria-label="Убрать ${esc(r.name)}">×</button></div>`).join("") : `<p class="muted tiny">Упражнений пока нет: найди их поиском ниже.</p>`;
+    };
+    const drawRes = () => {
+      const q = search.value.trim();
+      const list = q ? C.filter(C.EXERCISES, { q }).slice(0, 8) : C.EXERCISES.filter(e => e.kind === "strength").slice(0, 6);
+      res.innerHTML = list.map(e => `<button type="button" class="ghost lg-pick" data-add="${esc(e.id)}"><b>${esc(e.title)}</b><small>${esc(e.muscles.map(m => C.labelOf(C.MUSCLES, m)).join(", "))}</small></button>`).join("");
+    };
+    const drawList = async () => {
+      const r = await acc.coachAssignments(linkId), box = document.getElementById("alist");
+      if (!box) return;
+      if (!r.ok) { box.innerHTML = ""; return; }
+      box.innerHTML = r.data.items.length ? `<p class="muted tiny" style="margin:12px 0 4px">Назначено раньше</p>` + r.data.items.map(a => `<div class="row"><span>${esc(a.title)} <span class="muted tiny">${esc(ddmm(a.createdAt.slice(0, 10)))}</span></span>
+        <span>${a.status === "new" ? `<span class="pill">ждёт клиента</span> <button type="button" class="ghost tiny-btn" data-cancel="${a.id}">Отменить</button>` : a.status === "done" ? `<span class="pill">выполнено</span>` : `<span class="muted tiny">отменено</span>`}</span></div>`).join("") : "";
+    };
+    rowsEl.oninput = ev => { const t = ev.target; if (!t.dataset || !t.dataset.f) return; rows[+t.dataset.i][t.dataset.f] = t.value; };
+    rowsEl.onclick = ev => { const b = ev.target.closest && ev.target.closest("[data-rm]"); if (b) { rows.splice(+b.dataset.rm, 1); drawRows(); } };
+    res.onclick = ev => { const b = ev.target.closest && ev.target.closest("[data-add]"); if (!b) return; const e = C.byId(b.dataset.add); if (!e || rows.length >= 12) return; rows.push({ ex: e.id, name: e.title, sets: "3", reps: e.kind === "core" || e.kind === "stretch" ? "30 сек" : "10" }); drawRows(); };
+    search.oninput = drawRes;
+    document.getElementById("alist").onclick = async ev => { const b = ev.target.closest && ev.target.closest("[data-cancel]"); if (!b) return; await acc.coachCancelAssignment(linkId, b.dataset.cancel); drawList(); };
+    document.getElementById("asend").onclick = async () => {
+      const title = document.getElementById("atitle").value.trim();
+      stat.classList.remove("ok");
+      if (!title) { stat.textContent = "Впиши название тренировки."; return; }
+      if (!rows.length) { stat.textContent = "Добавь хотя бы одно упражнение."; return; }
+      if (rows.some(r => !(Number(r.sets) >= 1 && Number(r.sets) <= 10) || !String(r.reps).trim())) { stat.textContent = "У каждого упражнения: подходы от 1 до 10 и повторения."; return; }
+      const r = await acc.coachAssign(linkId, { title, note: document.getElementById("anote").value.trim() || undefined, items: rows.map(x => ({ ex: x.ex, name: x.name, sets: Number(x.sets), reps: String(x.reps).trim() })) });
+      stat.textContent = r.ok ? "Отправлено: клиент увидит задание на главной." : errText(r);
+      stat.classList.toggle("ok", !!r.ok);
+      if (r.ok) { rows.length = 0; document.getElementById("atitle").value = ""; document.getElementById("anote").value = ""; drawRows(); drawList(); }
+    };
+    drawRows(); drawRes(); drawList();
+  }
 })();

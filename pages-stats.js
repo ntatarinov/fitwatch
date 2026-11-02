@@ -14,20 +14,21 @@
   const parsed = d => ({ items: d.items.map(it => ({ ex: it.ex, name: it.name, sets: it.sets.map(s => ({ reps: Math.round(num(s.reps)) || 0, kg: Math.max(0, num(s.kg) || 0) })) })) });
   const hasData = d => !!d && d.items.some(it => it.sets.some(s => String(s.reps).trim() !== "" || String(s.kg).trim() !== ""));
   // Прошлые значения этого упражнения: подсказка в пустых полях («в прошлый раз 8 × 60»).
-  function lastSets(FW, ex) {
+  function lastSession(FW, ex) {
     const list = FW.state.sessions.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-    for (const s of list) { const it = s.items.find(x => x.ex === ex); if (it) return it.sets; }
+    for (const s of list) { const it = s.items.find(x => x.ex === ex); if (it) return { sets: it.sets, rpe: s.rpe || null }; }
     return null;
   }
+  function lastSets(FW, ex) { const l = lastSession(FW, ex); return l ? l.sets : null; }
   const hintFor = (FW, ex, i) => { const l = lastSets(FW, ex); if (!l) return ""; const s = l[Math.min(i, l.length - 1)]; return s.reps + "×" + String(s.kg).replace(".", ","); };
   // Цель на сегодня по прошлой тренировке: «9 × 24 кг (в прошлый раз 8 × 24)».
   const kgTxt = v => String(v).replace(".", ",");
   function goalLine(FW, ex) {
-    const prev = lastSets(FW, ex), t = prev && S().nextTarget(prev); if (!t) return "";
+    const ls = lastSession(FW, ex), prev = ls && ls.sets, t = prev && S().nextTarget(prev, ls.rpe); if (!t) return "";
     const top = prev.reduce((a, b) => (num(b.kg) > num(a.kg) || (num(b.kg) === num(a.kg) && num(b.reps) > num(a.reps)) ? b : a));
     const was = top.reps + (num(top.kg) > 0 ? " × " + kgTxt(top.kg) + " кг" : " повт.");
     const goal = t.kg > 0 ? t.reps + " × " + kgTxt(t.kg) + " кг" : t.reps + " повт.";
-    return `<div class="lg-goal"><b>Цель: ${goal}</b><span class="muted tiny"> · в прошлый раз ${was}${t.kind === "weight" ? ". Дошёл до 12, добавь вес" : ""}</span></div>`;
+    return `<div class="lg-goal"><b>Цель: ${goal}</b><span class="muted tiny"> · в прошлый раз ${was}${t.kind === "weight" ? ". Дошёл до 12, добавь вес" : t.kind === "easy" ? ". Было легко, добавь вес" : t.kind === "hold" ? ". Было тяжело, повтори то же" : ""}</span></div>`;
   }
   const newSet = (FW, ex, i, base) => ({ reps: "", kg: "", hint: hintFor(FW, ex, i) || base || "" });
   const blankDraft = FW => ({ id: FW.newId(), startedAt: Date.now(), title: "Тренировка", src: null, items: [] });
@@ -117,6 +118,7 @@
       <div class="card" id="lpick" ${d.items.length ? "hidden" : ""}><label for="lsearch"><b>Добавить упражнение</b></label><input id="lsearch" type="search" placeholder="Название: жим, присед, тяга…" autocomplete="off" style="width:100%"><div id="lres" class="lg-res"></div></div>
       <button type="button" class="ghost wide" id="ladd" ${d.items.length ? "" : "hidden"}>+ Добавить упражнение</button>
       <div id="lfin"></div>
+      ${d.items.length ? `<a class="btn ghost-btn wide-btn" href="#/go">Пошаговый режим: по одному упражнению, с отдыхом</a>` : ""}
       <div class="lg-total" id="ltotal"><div class="lg-sum" id="lsum">${totalsHtml()}</div><button type="button" id="lfinish">Завершить</button></div>
       <p class="center"><button type="button" class="ghost tiny-btn" id="ldiscard">Отменить тренировку</button></p>`;
 
@@ -172,13 +174,17 @@
       const min = Math.max(1, Math.min(600, Math.round((Date.now() - d.startedAt) / 60000)));
       document.getElementById("lfin").innerHTML = `<div class="card"><b>Завершить тренировку</b><label for="lmin" class="muted">Сколько минут заняла тренировка?</label>
         <input id="lmin" type="number" inputmode="numeric" min="1" max="600" value="${min}" style="width:120px"><p class="muted tiny">По таймеру: ${min} мин. Исправь, если забыл завершить вовремя.</p>
+        <div class="rpe"><span class="muted">Насколько тяжело было?</span><div class="chips" id="lrpe" role="group" aria-label="Тяжесть тренировки">${[[4, "Легко"], [7, "Нормально"], [9, "Тяжело"], [10, "На пределе"]].map(([v, l]) => `<button type="button" class="ghost" data-rpe="${v}" aria-pressed="false">${l}</button>`).join("")}</div><p class="muted tiny">Нужно для цели на следующий раз. Можно пропустить.</p></div>
         <div class="status" id="lerr" role="alert"></div><div class="cl-act wrap"><button type="button" id="lsave">Сохранить тренировку</button><button type="button" class="ghost" id="lcont">Продолжить</button></div></div>`;
       document.getElementById("lcont").onclick = () => { document.getElementById("lfin").innerHTML = ""; };
+      let rpe = null;
+      document.getElementById("lrpe").onclick = ev => { const b = ev.target.closest && ev.target.closest("[data-rpe]"); if (!b) return; rpe = rpe === Number(b.dataset.rpe) ? null : Number(b.dataset.rpe); document.querySelectorAll("#lrpe [data-rpe]").forEach(x => { const on = Number(x.dataset.rpe) === rpe; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); }); };
       document.getElementById("lsave").onclick = () => {
         const m = Math.round(num(document.getElementById("lmin").value));
         if (!(m >= 1 && m <= 600)) { document.getElementById("lerr").textContent = "Минуты: от 1 до 600."; return; }
-        const s = FW.finishSession(d, m);
+        const s = FW.finishSession(d, m, rpe);
         if (!s) { document.getElementById("lerr").textContent = "Нет ни одного подхода с повторениями."; return; }
+        if (d.src && d.src.p === "trainer" && window.Account.assignmentDone) window.Account.assignmentDone(d.src.d, s.id);
         FW.go("#/session/" + s.id + "/new");
       };
       document.getElementById("lmin").focus();
@@ -198,6 +204,7 @@
       ${fresh ? `<div class="celebrate"><span class="em">${ic("trophy", 54)}</span><b>Тренировка записана!</b></div>` : ""}
       <h1>${esc(s.title)}</h1><p class="muted">${esc(dd(s.date))}${s.pending ? " · ждёт отправки на сервер" : ""}</p>
       <div class="kpis kpis3"><div class="card kpi"><div class="kv">${esc(S().fmtTime(s.durationSec))}</div><div class="kl">Время</div></div><div class="card kpi"><div class="kv">${v.sets}</div><div class="kl">Подходов</div></div><div class="card kpi"><div class="kv">${esc(S().fmtKg(v.tonnage))}</div><div class="kl">Поднято всего</div></div></div>
+      ${s.rpe ? `<p class="muted">Тяжесть: ${s.rpe} из 10${s.rpe >= 9 ? " (тяжело)" : s.rpe <= 5 ? " (легко)" : ""}</p>` : ""}
       ${s.items.map(it => `<div class="card"><b>${esc(it.name)}</b><div class="lg-lines">${it.sets.map((x, i) => `<span class="pill">${i + 1}: ${x.kg > 0 ? x.reps + " × " + esc(String(x.kg).replace(".", ",")) + " кг" : x.reps + " повт."}</span>`).join("")}</div></div>`).join("")}
       ${muscles.length ? `<div class="card"><b>Какие мышцы работали</b><div class="tags" style="margin-top:8px">${muscles.map(m => `<span class="tag">${esc(label(m))} · ${ms[m]}</span>`).join("")}</div></div>` : ""}
       <div class="card"><b>Отправить тренеру</b><p class="muted" style="margin:6px 0 10px">Тренер получит сообщение в чате: упражнения, подходы, вес и итоги.</p><div id="lsend"></div></div>
@@ -302,4 +309,6 @@
       location.hash = "#/stats";
     };
   };
+  // Для пошагового режима (pages-go.js): те же черновик, подсказки и подсчёт, что в обычной записи.
+  P._log = { goalLine, newSet, startDay, hasData, parsed, blankDraft, lastSets, label };
 })();

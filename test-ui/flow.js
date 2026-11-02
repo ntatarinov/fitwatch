@@ -213,7 +213,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: t
   // 7c. идеи команды
   await go(w, "#/ideas");
   ok(/Идеи команды/.test(text(w, "h1")) && $$(w, ".person").length === 2, "идеи: два участника");
-  ok(/52%/.test(text(w, ".persons")) && /36%/.test(text(w, ".persons")), "идеи: проценты 52% и 36%");
+  ok(/53%/.test(text(w, ".persons")) && /36%/.test(text(w, ".persons")), "идеи: проценты 53% и 36%");
   ok($$(w, "#ideaslist .idea").length === 44 && $$(w, ".idea.st-ready").length >= 9, "идеи: 44 идеи, готовые отмечены");
   click(w, $(w, '[data-st="ready"]'));
   ok($$(w, "#ideaslist .idea").length === 12 && $$(w, "#ideaslist .idea").every(e => /Готово/.test(e.textContent)), "идеи: фильтр «Готово» оставляет 12 (9 у Сани и 3 у Айдархана)");

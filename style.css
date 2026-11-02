@@ -546,3 +546,17 @@ code { font-size:12px; background:var(--surface-2); padding:1px 6px; border-radi
 details.more { margin-top:12px; } details.more > summary { cursor:pointer; padding:12px 14px; border-radius:14px; background:var(--surface); border:1px solid var(--line); font-weight:600; color:var(--muted); list-style:none; }
 details.more > summary::-webkit-details-marker { display:none; }
 details.more[open] > summary { margin-bottom:12px; }
+
+/* Пошаговая тренировка и задания от тренера */
+.go-top { display:flex; align-items:center; gap:12px; margin:6px 0 8px; }
+.go-prog { flex:1; height:8px; border-radius:99px; background:var(--surface-2); overflow:hidden; } .go-prog i { display:block; height:100%; background:var(--accent-2); border-radius:99px; transition:width .3s; }
+.go-ex { display:grid; grid-template-columns:96px 1fr; gap:14px; align-items:center; margin:8px 0 12px; }
+.go-fig .body-svg { width:96px; max-width:96px; }
+.go-set.cur { background:var(--accent-soft); border-radius:12px; } .go-set.done { opacity:.7; }
+.go-rest { display:flex; align-items:center; gap:10px; margin:10px 0 0; padding:10px 12px; border-radius:12px; background:var(--surface-2); } .go-rest b { font-size:22px; font-variant-numeric:tabular-nums; margin-right:auto; }
+.rpe { margin-top:14px; } .rpe .chips { margin-top:6px; }
+.asg.done { opacity:.75; } .asg-items { margin:6px 0 12px; padding-left:18px; }
+.asg-build .arow { display:grid; grid-template-columns:1fr 60px 84px 40px; gap:6px; align-items:center; margin:6px 0; } .asg-build .arow input { width:100%; }
+.asg-build .alist .row { padding:6px 0; border-top:1px solid var(--line); }
+@media (max-width:420px) { .go-ex { grid-template-columns:72px 1fr; } .go-fig .body-svg { width:72px; max-width:72px; } .asg-build .arow { grid-template-columns:1fr 52px 72px 36px; } }
+.go-top .lg-clock { position:static; font-size:20px; }

@@ -7,9 +7,9 @@ test("в списке 33 пункта Сани (по его тексту) и 11 
   assert.equal(new Set(I.ITEMS.map(i => i.id)).size, I.ITEMS.length);
 });
 
-test("итоги совпадают с документом 07: Саня 9/16/8 → 52%, Айдархан 3/2/6 → 36%", () => {
+test("итоги совпадают с документом 07: Саня 9/17/7 → 53%, Айдархан 3/2/6 → 36%", () => {
   const s = I.summary(I.forWho("sanya")), a = I.summary(I.forWho("aidarkhan"));
-  assert.deepEqual([s.ready, s.partial, s.notDone, s.pct, s.strictPct], [9, 16, 8, 52, 27]);
+  assert.deepEqual([s.ready, s.partial, s.notDone, s.pct, s.strictPct], [9, 17, 7, 53, 27]);
   assert.deepEqual([a.ready, a.partial, a.notDone, a.pct, a.strictPct], [3, 2, 6, 36, 27]);
   assert.deepEqual(I.summary([]), { total: 0, ready: 0, partial: 0, planned: 0, later: 0, notDone: 0, pct: 0, strictPct: 0 });
 });
@@ -25,7 +25,7 @@ test("у каждой идеи заполнены название, метка �
 test("готовые и частично готовые идеи описывают, что сделано, и ведут на экран приложения", () => {
   I.ITEMS.filter(i => i.status === "ready" || i.status === "partial").forEach(i => {
     assert.ok(i.done.length > 10, i.id + ": что сделано");
-    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|body|checkin|machines|stats|log|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
+    assert.match(i.where, /^#\/(library|me|food|trainers?|sleep|tariffs|premium|rating|account|body|checkin|machines|stats|log|assigned|p\/\w+|d\/\w+\/\w+|x\/\w+)?(\/\w+)?$/, i.id + ": ссылка " + i.where);
   });
   I.ITEMS.filter(i => i.status === "planned" || i.status === "later").forEach(i => assert.ok(i.when.length > 3 || i.done.length > 0, i.id + ": когда"));
 });

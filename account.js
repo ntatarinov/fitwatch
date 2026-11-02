@@ -98,6 +98,12 @@
     coachNote: (id, note) => api("PATCH", "/api/coach/clients/" + id + "/note", { note }),
     messages: (id, after) => api("GET", "/api/links/" + id + "/messages?after=" + (after || 0)),
     sendMessage: (id, body) => api("POST", "/api/links/" + id + "/messages", { body }),
+    // тренировки от тренера
+    assignments: () => api("GET", "/api/assignments"),
+    assignmentDone: (id, sessionId) => api("POST", "/api/assignments/" + id + "/done", { sessionId }),
+    coachAssign: (linkId, v) => api("POST", "/api/coach/clients/" + linkId + "/assignments", v),
+    coachAssignments: linkId => api("GET", "/api/coach/clients/" + linkId + "/assignments"),
+    coachCancelAssignment: (linkId, id) => api("DELETE", "/api/coach/clients/" + linkId + "/assignments/" + id),
     // администратор
     adminTrainers: status => api("GET", "/api/admin/trainers?status=" + status),
     adminVerdict: (id, action) => api("POST", "/api/admin/trainers/" + id + "/" + action, {}),

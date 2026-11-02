@@ -312,6 +312,7 @@ require("./trainers").install(kit);
 require("./coach").install(kit);
 require("./roles").install(kit);
 require("./sessions").install(kit);
+require("./assignments").install(kit);
 
 // ---- вход в обработку ----
 async function handle(req, opts) {

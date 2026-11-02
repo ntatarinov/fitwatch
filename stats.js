@@ -86,12 +86,16 @@
   const nbsp = " ";
   // Цель на сегодня по простой схеме тренера (двойная прогрессия): добавил повторение, дошёл до 12 — добавь вес и снова начни с 8.
   // Своё тело (вес 0): просто на повторение больше. prev — подходы прошлой тренировки этого упражнения.
-  function nextTarget(prev) {
+  // rpe — как тяжело было в прошлый раз (1–10): 9–10 — повтори то же, 5 и ниже — было легко, можно добавить вес.
+  function nextTarget(prev, rpe) {
     const sets = (Array.isArray(prev) ? prev : []).filter(s => s && num(s.reps) > 0);
     if (!sets.length) return null;
     const top = sets.reduce((a, b) => (num(b.kg) > num(a.kg) || (num(b.kg) === num(a.kg) && num(b.reps) > num(a.reps)) ? b : a));
     const kg = Math.max(0, num(top.kg)), reps = Math.round(num(top.reps));
-    if (kg <= 0) return { kind: "rep", reps: reps + 1, kg: 0 };
+    const hard = Number(rpe) >= 9, easy = Number(rpe) > 0 && Number(rpe) <= 5, step = kg < 20 ? 1 : 2.5;
+    if (hard) return { kind: "hold", reps, kg };
+    if (kg <= 0) return { kind: "rep", reps: reps + (easy ? 2 : 1), kg: 0 };
+    if (easy && reps >= 8) return { kind: "easy", reps, kg: Math.round((kg + step) * 10) / 10 };
     if (reps >= 12) return { kind: "weight", reps: 8, kg: Math.round((kg + (kg < 20 ? 1 : 2.5)) * 10) / 10 };
     return { kind: "rep", reps: reps + 1, kg };
   }
@@ -131,7 +135,7 @@
       const ss = setsOf(it);
       if (ss.length) lines.push(it.name + ": " + ss.map(s => (num(s.kg) > 0 ? s.reps + "×" + num(s.kg).toString().replace(".", ",") : s.reps + " повт.")).join(", "));
     });
-    const tail = "\nИтого: " + v.sets + " подходов, " + fmtKg(v.tonnage).replace(nbsp, " ") + ", " + fmtTime(session.durationSec).replace(/\u00A0/g, " ") + ".";
+    const tail = "\nИтого: " + v.sets + " подходов, " + fmtKg(v.tonnage).replace(nbsp, " ") + ", " + fmtTime(session.durationSec).replace(/\u00A0/g, " ") + (session.rpe ? ", тяжесть " + session.rpe + " из 10" : "") + ".";
     let body = "Тренировка" + (dateLabel ? " " + dateLabel : "") + ": " + session.title + "\n" + lines.join("\n");
     // Сообщение тренеру не длиннее 2000 символов: длинный список упражнений обрезается, итог остаётся.
     if (body.length + tail.length > 1990) body = body.slice(0, 1990 - tail.length - 2).replace(/\n[^\n]*$/, "") + "\n…";

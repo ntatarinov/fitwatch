@@ -182,6 +182,32 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS workout_sessions_user_day ON workout_sessions(user_id, day DESC)`,
     ],
   },
+  {
+    version: 9,
+    name: "how hard was the workout (RPE 1-10)",
+    sql: [`ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS rpe smallint CHECK (rpe IS NULL OR rpe BETWEEN 1 AND 10)`],
+  },
+  {
+    version: 10,
+    name: "workouts assigned by a trainer to a client",
+    sql: [
+      `CREATE TABLE IF NOT EXISTS trainer_assignments (
+         id bigserial PRIMARY KEY,
+         link_id bigint NOT NULL REFERENCES trainer_links(id) ON DELETE CASCADE,
+         trainer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         client_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         title text NOT NULL CHECK (char_length(title) BETWEEN 1 AND 80),
+         note text CHECK (note IS NULL OR char_length(note) <= 500),
+         items jsonb NOT NULL,
+         status text NOT NULL DEFAULT 'new' CHECK (status IN ('new','done','cancelled')),
+         session_id uuid,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         done_at timestamptz
+       )`,
+      `CREATE INDEX IF NOT EXISTS trainer_assignments_client ON trainer_assignments(client_id, status, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS trainer_assignments_link ON trainer_assignments(link_id, created_at DESC)`,
+    ],
+  },
 ];
 
 module.exports = { MIGRATIONS };
