@@ -58,7 +58,8 @@ test("3D-анатомия: модель на месте, в ней все 14 г�
   assert.match(gltf.asset.copyright, /BodyParts3D.*Database Center for Life Science.*CC BY 4\.0/, "подпись авторов в самом файле");
   assert.ok((gltf.extensionsUsed || []).includes("EXT_meshopt_compression"), "сжатие meshopt");
   assert.match(B3.CREDIT, /BodyParts3D.*CC BY 4\.0/);
-  B3.LIBS.forEach(u => assert.match(u, /^https:\/\/(cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r128\/|cdn\.jsdelivr\.net\/npm\/three@0\.128\.0\/)/, "библиотеки закреплены по версии: " + u));
+  B3.LIBS.forEach(u => { assert.match(u, /^\/vendor\/.*-r128.*\.js$/, "библиотеки свои и закреплены по версии: " + u); assert.ok(fs.existsSync(path.join(__dirname, "..", u.replace(/^\//, ""))), "файл на месте: " + u); });
+  assert.equal(B3.MODEL_BYTES, buf.length, "размер модели для индикатора загрузки совпадает с файлом");
   assert.equal(B3.hasWebGL(), false, "без браузера WebGL нет — mount честно откажет");
 });
 

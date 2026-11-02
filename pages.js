@@ -141,7 +141,7 @@
         shown3d = true;
         box.innerHTML = seg() + `<div class="b3d" id="b3d"><p class="muted b3d-msg">Загружаю 3D-модель мышц…</p></div>` + list3d();
         const nav = FW.nav();
-        const onProgress = p => { const m = document.querySelector("#b3d .b3d-msg"); if (m) m.textContent = "Загружаю 3D-модель мышц… " + Math.round(p * 100) + "%"; };
+        const onProgress = p => { const m = document.querySelector("#b3d .b3d-msg"); if (m) m.textContent = p >= 1 ? "Собираю модель…" : "Загружаю 3D-модель мышц: " + Math.round(p * 100) + "% (" + (p * window.Body3D.MODEL_BYTES / 1048576).toFixed(1).replace(".", ",") + " из " + (window.Body3D.MODEL_BYTES / 1048576).toFixed(1).replace(".", ",") + " МБ)"; };
         window.Body3D.mount(document.getElementById("b3d"), { selected: lib.muscle, labels, onProgress, onPick: m => { lib.muscle = m; draw(); } })
           .then(c => { if (FW.stale(nav) || lib.view !== "3d") { c.destroy(); return; } ctl3d = c; })
           .catch(() => {
@@ -174,6 +174,7 @@
         : "<div class='card'><p class='muted'>Ничего не найдено. Сбросьте фильтры или выберите другую мышцу.</p></div>";
     };
     draw();
+    if (window.Body3D && window.Body3D.preload) window.Body3D.preload(); // пока смотришь на рисунок, 3D уже качается
     // После перерисовки схемы фокус возвращается на ту же зону: с клавиатуры можно выбирать мышцы подряд.
     const pick = m => { const kb = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.m; lib.muscle = lib.muscle === m ? "" : m; draw(); if (kb) { const z = document.querySelector('#bodywrap [data-m="' + kb + '"]'); if (z && z.focus) z.focus(); } };
     const wrap = document.getElementById("bodywrap");

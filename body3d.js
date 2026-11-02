@@ -4,12 +4,9 @@
 // Three.js, загрузчик и распаковщик сжатия грузятся только при открытии 3D; без WebGL или без сети — честный отказ.
 (function (root) {
   "use strict";
-  const LIBS = [
-    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
-    "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",
-    "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js",
-  ];
-  const SRC = LIBS[0], MODEL = "/models/anatomy.glb";
+  // Библиотеки лежат на нашем сайте (vendor/, three.js r128, лицензия MIT): не нужны три чужих сервера, всё запоминает кэш приложения.
+  const LIBS = ["/vendor/three-r128.min.js", "/vendor/GLTFLoader-r128.js", "/vendor/meshopt_decoder-r128.js"];
+  const SRC = LIBS[0], MODEL = "/models/anatomy.glb", MODEL_BYTES = 2642796;
   const CREDIT = "3D-модель: BodyParts3D, © The Database Center for Life Science, CC BY 4.0";
   const CREDIT_URL = "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html";
   // Группы мышц модели (узлы m_<id>), id как в каталоге.
@@ -66,6 +63,37 @@
       .then(() => root.THREE).catch(e => { loading = null; throw e; });
     return loading;
   }
+  // Модель скачивается один раз и держится в памяти страницы: повторное открытие 3D и предзагрузка при открытии каталога не качают её заново.
+  let modelP = null, got = 0;
+  const watchers = [];
+  function fetchModel(onProgress) {
+    if (onProgress) { watchers.push(onProgress); try { onProgress(Math.min(1, got / MODEL_BYTES)); } catch (e) { /* подписчик не должен мешать загрузке */ } }
+    if (modelP) return modelP;
+    modelP = (async () => {
+      const r = await root.fetch(MODEL);
+      if (!r.ok) throw new Error("model " + r.status);
+      const total = Number(r.headers.get("content-length")) || MODEL_BYTES;
+      if (!r.body || !r.body.getReader) { const b = await r.arrayBuffer(); got = MODEL_BYTES; return b; }
+      const reader = r.body.getReader(), parts = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value); got += value.length;
+        watchers.slice().forEach(f => { try { f(Math.min(1, got / total)); } catch (e) { /* то же */ } });
+      }
+      const out = new Uint8Array(got); let at = 0; parts.forEach(p => { out.set(p, at); at += p.length; });
+      return out.buffer;
+    })().catch(e => { modelP = null; got = 0; throw e; });
+    return modelP;
+  }
+  // Предзагрузка: библиотеки и модель начинают качаться, пока человек ещё смотрит на рисунок. Не на медленной сети и не в режиме экономии трафика.
+  function preload() {
+    try {
+      const c = root.navigator && root.navigator.connection;
+      if (!hasWebGL() || (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || "")))) return Promise.resolve(false);
+    } catch (e) { return Promise.resolve(false); }
+    return Promise.all([load(), fetchModel()]).then(() => true, () => false);
+  }
   const cssColor = (name, fallback) => {
     try { const v = root.getComputedStyle(root.document.documentElement).getPropertyValue(name).trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : fallback; } catch (e) { return fallback; }
   };
@@ -76,10 +104,12 @@
     if (!hasWebGL()) throw new Error("webgl");
     const THREE = await load();
     if (!el.isConnected) throw new Error("gone");
+    const buf = await fetchModel(o.onProgress);
+    if (!el.isConnected) throw new Error("gone");
     const gltf = await new Promise((ok, fail) => {
       const loader = new THREE.GLTFLoader();
       loader.setMeshoptDecoder(root.MeshoptDecoder);
-      loader.load(MODEL, ok, ev => { if (o.onProgress && ev.total) o.onProgress(ev.loaded / ev.total); }, fail);
+      loader.parse(buf, "", ok, fail);
     });
     if (!el.isConnected) throw new Error("gone");
     const names = o.labels || {};
@@ -239,7 +269,7 @@
     };
   }
 
-  const api = { choose, dequantize, FRONT_ONLY, BACK_ONLY, LIBS, SRC, MODEL, CREDIT, CREDIT_URL, MUSCLES, muscles, hasWebGL, load, mount };
+  const api = { preload, MODEL_BYTES, choose, dequantize, FRONT_ONLY, BACK_ONLY, LIBS, SRC, MODEL, CREDIT, CREDIT_URL, MUSCLES, muscles, hasWebGL, load, mount };
   root.Body3D = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

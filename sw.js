@@ -2,7 +2,9 @@
 // Правила безопасности: запросы к /api/ и чужие адреса он не трогает вообще, ничего личного не кэширует.
 // Статика берётся сначала из сети (всегда свежая версия). Кэш — целая оболочка одной версии, записанная при установке:
 // без сети приложение открывается из неё, а не из смеси старых и новых файлов. Зависшая сеть ждёт не больше 4 секунд.
-const VERSION = "fw-0.12.0";
+const VERSION = "fw-0.12.1";
+// Тяжёлое и неизменное (3D-модель и библиотеки) хранится отдельно и не удаляется при смене версии: сначала кэш, при первой загрузке сеть.
+const STATIC = "fw-3d-1";
 const SHELL = [
   "/", "/index.html", "/style.css", "/manifest.webmanifest",
   "/data.js", "/catalog.js", "/machines.js", "/nutrition.js", "/planner.js", "/body.js", "/body3d.js", "/ideas.js", "/achievements.js", "/fx.js", "/engine.js", "/tree.js",
@@ -16,7 +18,7 @@ self.addEventListener("install", e => {
 });
 
 self.addEventListener("activate", e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== STATIC).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 const TIMEOUT_MS = 4000;
@@ -25,6 +27,13 @@ const fromCache = req => caches.match(req, { ignoreSearch: req.mode === "navigat
 self.addEventListener("fetch", e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (url.pathname.startsWith("/vendor/") || url.pathname.startsWith("/models/")) {
+    e.respondWith(caches.open(STATIC).then(async c => {
+      const hit = await c.match(req); if (hit) return hit;
+      const r = await fetch(req); if (r.ok) c.put(req, r.clone()); return r;
+    }));
+    return;
+  }
   e.respondWith((async () => {
     const net = fetch(req);
     try {
